@@ -2,6 +2,7 @@ import React from 'react';
 import { X, Volume2, VolumeX, Sparkles, Sliders, Layers, Music, Clock } from 'lucide-react';
 import { soundEngine, type SoundEffectType } from '../audio/soundEngine';
 import { CLOCK_PRESETS, type ClockStylePreset } from '../utils/themeAdapter';
+import { useAuth } from '../context/AuthContext';
 
 interface SettingsDrawerProps {
   isOpen: boolean;
@@ -47,6 +48,9 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
   includeYears,
   setIncludeYears,
 }) => {
+  const { currentUser, updatePreferences } = useAuth();
+  const isAutoRotate = currentUser?.preferences?.autoRotate24h !== false;
+
   if (!isOpen) return null;
 
   const handleSoundChange = (type: SoundEffectType) => {
@@ -295,6 +299,31 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                 <div
                   className={`w-4 h-4 rounded-full bg-white transition-transform ${
                     includeYears ? 'translate-x-6' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* 24-Hour Artwork Auto-Rotation Toggle */}
+            <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
+              <div>
+                <p className="text-xs font-bold text-white">24-Hour Artwork Auto-Rotation</p>
+                <p className="text-[10px] text-neutral-400">
+                  Rotates background daily to fresh artworks matching your themes
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  soundEngine.playUiClick();
+                  updatePreferences({ autoRotate24h: !isAutoRotate });
+                }}
+                className={`w-12 h-6 rounded-full transition-colors relative p-1 ${
+                  isAutoRotate ? 'bg-emerald-500' : 'bg-neutral-800'
+                }`}
+              >
+                <div
+                  className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                    isAutoRotate ? 'translate-x-6' : 'translate-x-0'
                   }`}
                 />
               </button>

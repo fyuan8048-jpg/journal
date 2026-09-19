@@ -88,11 +88,11 @@ function AppContent() {
 
   // Modals & UI States
   const [isBackgroundModalOpen, setIsBackgroundModalOpen] = useState(false);
-  const [backgroundModalTab, setBackgroundModalTab] = useState<'daily' | 'curated' | 'custom'>('curated');
+  const [backgroundModalTab, setBackgroundModalTab] = useState<'daily' | 'curated' | 'custom' | 'web'>('curated');
   const [isInterestModalOpen, setIsInterestModalOpen] = useState(false);
   const [isCountdownModalOpen, setIsCountdownModalOpen] = useState(false);
 
-  const handleOpenBackgrounds = (tab: 'daily' | 'curated' | 'custom' = 'curated') => {
+  const handleOpenBackgrounds = (tab: 'daily' | 'curated' | 'custom' | 'web' = 'curated') => {
     setBackgroundModalTab(tab);
     setIsBackgroundModalOpen(true);
   };
@@ -115,6 +115,25 @@ function AppContent() {
       soundEngine.toggleDrone(true);
     }
   }, []);
+
+  // 24-Hour Auto-Rotation Background Engine
+  useEffect(() => {
+    if (preferences?.autoRotate24h !== false && !activeCustomUrl) {
+      const lastRot = preferences?.lastRotationTimestamp || 0;
+      const now = Date.now();
+      const oneDayMs = 24 * 60 * 60 * 1000;
+      
+      // If 24 hours elapsed or daily rotation needs refresh
+      if (now - lastRot > oneDayMs) {
+        const daily = getDailyBackground(preferences?.interests || ['doom', 'marvel'], 0);
+        setActiveBackground(daily);
+        updatePreferences({
+          activeBackgroundId: daily.id,
+          lastRotationTimestamp: now
+        });
+      }
+    }
+  }, [preferences?.autoRotate24h, activeCustomUrl]);
 
   // Update daily background when user preferences change
   useEffect(() => {
@@ -334,6 +353,7 @@ function AppContent() {
           updatePreferences({ activeCustomImageUrl: url });
           showToast('✓ Custom wallpaper applied');
         }}
+        activeCountdown={activeCountdown}
       />
 
       <InterestModal

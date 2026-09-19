@@ -9,11 +9,22 @@ import {
   DEFAULT_COUNTDOWN_EVENTS,
   DEFAULT_CLOCK_CUSTOM_SETTINGS,
 } from '../utils/countdown';
+import { auth, db, isFirebaseConfigured } from '../firebase/config';
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+  GoogleAuthProvider,
+  signInWithPopup
+} from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export interface UserCustomImage {
   id: string;
   name: string;
-  url: string; // URL or Base64 data URL
+  url: string;
   collectionName: string;
   addedAt: number;
 }
@@ -40,15 +51,17 @@ export interface UserProfile {
     activeBackgroundId?: string;
     activeCustomImageUrl?: string;
     clockCustomSettings?: ClockCustomSettings;
+    autoRotate24h?: boolean;
+    lastRotationTimestamp?: number;
   };
 }
 
 interface AuthContextType {
   currentUser: UserProfile | null;
   usersList: UserProfile[];
-  login: (emailOrUsername: string, password?: string) => { success: boolean; error?: string };
-  signup: (email: string, password: string, username: string, avatar?: string) => { success: boolean; error?: string };
-  logout: () => void;
+  login: (emailOrUsername: string, password?: string) => Promise<{ success: boolean; error?: string }>;
+  signup: (email: string, password: string, username: string, avatar?: string) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
   updatePreferences: (partial: Partial<UserProfile['preferences']>) => void;
   addCustomImage: (img: Omit<UserCustomImage, 'id' | 'addedAt'>) => void;
   removeCustomImage: (id: string) => void;
@@ -58,21 +71,21 @@ interface AuthContextType {
   removeCustomCountdown: (id: string) => void;
   updateCountdownNotes: (countdownId: string, notes: CountdownNote[]) => void;
   updateClockCustomSettings: (settings: ClockCustomSettings) => void;
+  isFirebaseConfigured: boolean;
+  resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
+  signInWithGoogle: () => Promise<{ success: boolean; error?: string }>;
 }
 
-const STORAGE_KEY_USERS = 'avengers_doomsday_clock_users_v2';
-const STORAGE_KEY_CURRENT = 'avengers_doomsday_clock_current_user_v2';
+const STORAGE_KEY_USERS = 'avengers_doomsday_clock_users_v3';
+const STORAGE_KEY_CURRENT = 'avengers_doomsday_clock_current_user_v3';
 
-const DEFAULT_AVATARS = [
-  '🛡️', '⚡', '👑', '👁️', '🪐', '🔮', '🤖', '💀', '🌌'
-];
+const DEFAULT_AVATARS = ['🛡️', '⚡', '👑', '👁️', '🪐', '🔮', '🤖', '💀', '🌌'];
 
-export function simpleHash(str: string): string {
-  let hash = 5381;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) + hash) + str.charCodeAt(i);
-  }
-  return 'h_' + (hash >>> 0).toString(16);
+export async function strongHash(str: string): Promise<string> {
+  const msgBuffer = new TextEncoder().encode(str);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return 'sha256_' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 const DEFAULT_GUEST: UserProfile = {
@@ -98,17 +111,12 @@ const DEFAULT_GUEST: UserProfile = {
         url: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?q=80&w=2000&auto=format&fit=crop',
         collectionName: 'Latverian Royalty',
         addedAt: Date.now() - 100000,
-      },
-      {
-        id: 'sample_doom_2',
-        name: 'Avengers: Doomsday Battle Monolith',
-        url: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=2000&auto=format&fit=crop',
-        collectionName: 'Multiverse Incursions',
-        addedAt: Date.now() - 50000,
       }
     ],
     customCountdowns: DEFAULT_COUNTDOWN_EVENTS,
     clockCustomSettings: DEFAULT_CLOCK_CUSTOM_SETTINGS,
+    autoRotate24h: true,
+    lastRotationTimestamp: Date.now(),
   }
 };
 
@@ -120,22 +128,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const savedCurrent = localStorage.getItem(STORAGE_KEY_CURRENT);
       if (savedCurrent) {
         const parsed = JSON.parse(savedCurrent);
-        if (!parsed.preferences) {
-          parsed.preferences = { ...DEFAULT_GUEST.preferences };
-        }
-        if (!parsed.preferences.customImages) {
-          parsed.preferences.customImages = DEFAULT_GUEST.preferences.customImages;
-        }
-        if (!parsed.preferences.customCountdowns) {
-          parsed.preferences.customCountdowns = DEFAULT_GUEST.preferences.customCountdowns;
-        }
-        if (!parsed.preferences.clockCustomSettings) {
-          parsed.preferences.clockCustomSettings = DEFAULT_CLOCK_CUSTOM_SETTINGS;
-        }
-        if (!parsed.email) {
-          parsed.email = 'agent@latveria.com';
-        }
-        return parsed;
+        return { ...DEFAULT_GUEST, ...parsed, preferences: { ...DEFAULT_GUEST.preferences, ...parsed.preferences } };
       }
     } catch {}
     return DEFAULT_GUEST;
@@ -145,17 +138,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const saved = localStorage.getItem(STORAGE_KEY_USERS);
       if (saved) {
-        const parsed: UserProfile[] = JSON.parse(saved);
-        return parsed.map(u => ({
-          ...u,
-          email: u.email || 'agent@latveria.com',
-        }));
+        return JSON.parse(saved);
       }
     } catch {}
     return [DEFAULT_GUEST];
   });
 
-  // Save current user & list whenever changed
+  useEffect(() => {
+    const firestore = db;
+    const authInstance = auth;
+    if (!isFirebaseConfigured || !authInstance || !firestore) return;
+    const unsubscribe = onAuthStateChanged(authInstance, async (user) => {
+      if (user) {
+        try {
+          const docRef = doc(firestore, 'users', user.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const profile = docSnap.data() as UserProfile;
+            setCurrentUser(profile);
+            setUsersList(prev => {
+              const list = [...prev];
+              const idx = list.findIndex(u => u.id === profile.id);
+              if (idx >= 0) list[idx] = profile;
+              else list.push(profile);
+              return list;
+            });
+          }
+        } catch (e) {
+          console.error('Failed to load user profile from Firestore', e);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const saveToFirebase = async (profile: UserProfile) => {
+    const firestore = db;
+    if (isFirebaseConfigured && auth?.currentUser && firestore && profile.id !== 'guest') {
+      try {
+        await setDoc(doc(firestore, 'users', profile.id), profile);
+      } catch (e) {
+        console.error('Failed to save to Firestore:', e);
+      }
+    }
+  };
+
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY_CURRENT, JSON.stringify(currentUser));
@@ -165,98 +192,149 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(updatedList));
       setUsersList(updatedList);
+      saveToFirebase(currentUser);
     } catch (e) {
-      console.warn('Failed to save auth state:', e);
+      console.warn('Failed to save auth state locally:', e);
     }
   }, [currentUser]);
 
-  const login = (emailOrUsername: string, password?: string): { success: boolean; error?: string } => {
+  const login = async (emailOrUsername: string, password?: string): Promise<{ success: boolean; error?: string }> => {
     const query = emailOrUsername.trim().toLowerCase();
-    if (!query) {
-      return { success: false, error: 'Please enter your email or username' };
-    }
+    if (!query) return { success: false, error: 'Please enter your email or username' };
 
-    const user = usersList.find(u =>
-      (u.email && u.email.toLowerCase() === query) ||
-      (u.username && u.username.toLowerCase() === query)
-    );
+    if (isFirebaseConfigured && auth) {
+      if (!password) return { success: false, error: 'Please enter your password' };
+      try {
+        await signInWithEmailAndPassword(auth, query, password);
+        return { success: true };
+      } catch (e: any) {
+        return { success: false, error: e.message || 'Firebase login failed' };
+      }
+    } else {
+      const user = usersList.find(u =>
+        (u.email && u.email.toLowerCase() === query) ||
+        (u.username && u.username.toLowerCase() === query)
+      );
+      if (!user) return { success: false, error: 'No operative found with this email or username' };
 
-    if (!user) {
-      return { success: false, error: 'No operative found with this email or username' };
-    }
-
-    // Check password if set
-    if (user.passwordHash) {
-      if (!password) {
+      if (user.passwordHash && password) {
+        const hashed = await strongHash(password);
+        if (user.passwordHash !== hashed) {
+          return { success: false, error: 'Incorrect password. Access denied.' };
+        }
+      } else if (user.passwordHash && !password) {
         return { success: false, error: 'Please enter your password' };
       }
-      if (user.passwordHash !== simpleHash(password)) {
-        return { success: false, error: 'Incorrect password. Access denied.' };
-      }
-    }
 
-    setCurrentUser(user);
-    return { success: true };
+      setCurrentUser(user);
+      return { success: true };
+    }
   };
 
-  const signup = (
-    email: string,
-    password: string,
-    username: string,
-    avatar?: string
-  ): { success: boolean; error?: string } => {
+  const signup = async (email: string, password: string, username: string, avatar?: string): Promise<{ success: boolean; error?: string }> => {
     const cleanEmail = email.trim().toLowerCase();
     const cleanUsername = username.trim();
-
     if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
-      return { success: false, error: 'Please provide a valid email address (e.g. agent@mcu.com)' };
+      return { success: false, error: 'Please provide a valid email address' };
     }
-
     if (!password || password.length < 6) {
       return { success: false, error: 'Password must be at least 6 characters long' };
     }
-
     if (!cleanUsername) {
-      return { success: false, error: 'Please choose an operative username' };
-    }
-
-    const existingEmail = usersList.find(
-      u => u.email && u.email.toLowerCase() === cleanEmail && u.id !== 'guest'
-    );
-    if (existingEmail) {
-      return { success: false, error: 'An operative account with this email already exists. Please log in.' };
+      return { success: false, error: 'Please choose a username' };
     }
 
     const randomAvatar = avatar || DEFAULT_AVATARS[Math.floor(Math.random() * DEFAULT_AVATARS.length)];
-    const newUser: UserProfile = {
-      id: `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      username: cleanUsername,
-      email: cleanEmail,
-      passwordHash: simpleHash(password),
-      avatar: randomAvatar,
-      createdAt: Date.now(),
-      preferences: {
-        ...DEFAULT_GUEST.preferences,
-        interests: ['doom', 'marvel'],
-      },
-    };
 
-    setCurrentUser(newUser);
-    return { success: true };
+    const firestore = db;
+    const authInstance = auth;
+    if (isFirebaseConfigured && authInstance && firestore) {
+      try {
+        const userCred = await createUserWithEmailAndPassword(authInstance, cleanEmail, password);
+        const newUser: UserProfile = {
+          id: userCred.user.uid,
+          username: cleanUsername,
+          email: cleanEmail,
+          avatar: randomAvatar,
+          createdAt: Date.now(),
+          preferences: { ...DEFAULT_GUEST.preferences },
+        };
+        await setDoc(doc(firestore, 'users', newUser.id), newUser);
+        setCurrentUser(newUser);
+        return { success: true };
+      } catch (e: any) {
+        return { success: false, error: e.message || 'Firebase signup failed' };
+      }
+    } else {
+      const existingEmail = usersList.find(u => u.email?.toLowerCase() === cleanEmail && u.id !== 'guest');
+      if (existingEmail) return { success: false, error: 'An account with this email already exists' };
+
+      const hashed = await strongHash(password);
+      const newUser: UserProfile = {
+        id: `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        username: cleanUsername,
+        email: cleanEmail,
+        passwordHash: hashed,
+        avatar: randomAvatar,
+        createdAt: Date.now(),
+        preferences: { ...DEFAULT_GUEST.preferences },
+      };
+      setCurrentUser(newUser);
+      return { success: true };
+    }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    if (isFirebaseConfigured && auth) {
+      await signOut(auth);
+    }
     setCurrentUser(DEFAULT_GUEST);
   };
 
-  const updatePreferences = (partial: Partial<UserProfile['preferences']>) => {
-    setCurrentUser(prev => ({
-      ...prev,
-      preferences: {
-        ...prev.preferences,
-        ...partial,
+  const resetPassword = async (email: string): Promise<{ success: boolean; error?: string }> => {
+    if (!isFirebaseConfigured || !auth) return { success: false, error: 'Firebase is not configured' };
+    try {
+      await sendPasswordResetEmail(auth, email);
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message || 'Failed to send reset email' };
+    }
+  };
+
+  const signInWithGoogle = async (): Promise<{ success: boolean; error?: string }> => {
+    const firestore = db;
+    const authInstance = auth;
+    if (!isFirebaseConfigured || !authInstance || !firestore) return { success: false, error: 'Firebase is not configured' };
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(authInstance, provider);
+      const user = result.user;
+      
+      const docRef = doc(firestore, 'users', user.uid);
+      const docSnap = await getDoc(docRef);
+      
+      if (!docSnap.exists()) {
+        const newUser: UserProfile = {
+          id: user.uid,
+          username: user.displayName || 'Google Operative',
+          email: user.email || '',
+          avatar: DEFAULT_AVATARS[0],
+          createdAt: Date.now(),
+          preferences: { ...DEFAULT_GUEST.preferences },
+        };
+        await setDoc(docRef, newUser);
+        setCurrentUser(newUser);
+      } else {
+        setCurrentUser(docSnap.data() as UserProfile);
       }
-    }));
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message || 'Google sign-in failed' };
+    }
+  };
+
+  const updatePreferences = (partial: Partial<UserProfile['preferences']>) => {
+    setCurrentUser(prev => ({ ...prev, preferences: { ...prev.preferences, ...partial } }));
   };
 
   const addCustomImage = (img: Omit<UserCustomImage, 'id' | 'addedAt'>) => {
@@ -316,7 +394,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const deleteCountdown = (id: string) => {
     setCurrentUser(prev => {
       const filtered = prev.preferences.customCountdowns.filter(e => e.id !== id);
-      // If active countdown was deleted, switch to the first remaining or a fresh fallback
       const nextActiveId = prev.preferences.activeCountdownId === id
         ? (filtered[0]?.id || 'doomsday')
         : prev.preferences.activeCountdownId;
@@ -329,7 +406,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             {
               id: 'doomsday',
               title: 'AVENGERS: DOOMSDAY',
-              subtitle: 'THE DOOMSDAY CLOCK IS TICKING • IN THEATERS WORLDWIDE',
+              subtitle: 'THE DOOMSDAY CLOCK IS TICKING',
               targetDate: '2026-12-18T00:00:00',
               category: 'marvel',
               themePreset: 'doomsday',
@@ -381,6 +458,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         removeCustomCountdown: deleteCountdown,
         updateCountdownNotes,
         updateClockCustomSettings,
+        isFirebaseConfigured,
+        resetPassword,
+        signInWithGoogle
       }}
     >
       {children}

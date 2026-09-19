@@ -1,147 +1,285 @@
 // Dynamic Web Artwork Discovery Engine
-// Accurately fetches and generates high-definition artworks from the web matching user interests
+// Fetches high-definition artworks from the Unsplash API matching countdown themes
+// Falls back to curated library when API is unavailable
 
-import type { BackgroundItem } from '../data/curatedBackgrounds';
+import type { BackgroundItem, UserInterest } from '../data/curatedBackgrounds';
 
-// Curated high-definition web artwork database mapped accurately to interests & characters
+const UNSPLASH_ACCESS_KEY = import.meta.env.VITE_UNSPLASH_ACCESS_KEY || '';
+const UNSPLASH_API = 'https://api.unsplash.com';
+
+// Cache to avoid redundant API calls within a session
+const searchCache = new Map<string, BackgroundItem[]>();
+
+// Color palette templates by mood
+const PALETTE_TEMPLATES: Record<string, BackgroundItem['palette']> = {
+  dark: { primary: '#00ff88', secondary: '#059669', glowColor: 'rgba(0, 255, 136, 0.6)', badgeBg: 'rgba(5, 150, 105, 0.25)', accentHex: '#00ff88' },
+  warm: { primary: '#f59e0b', secondary: '#d97706', glowColor: 'rgba(245, 158, 11, 0.6)', badgeBg: 'rgba(217, 119, 6, 0.25)', accentHex: '#f59e0b' },
+  cool: { primary: '#38bdf8', secondary: '#0284c7', glowColor: 'rgba(56, 189, 248, 0.6)', badgeBg: 'rgba(2, 132, 199, 0.3)', accentHex: '#38bdf8' },
+  cosmic: { primary: '#a78bfa', secondary: '#7c3aed', glowColor: 'rgba(167, 139, 250, 0.6)', badgeBg: 'rgba(124, 58, 237, 0.25)', accentHex: '#a78bfa' },
+  red: { primary: '#ef4444', secondary: '#b91c1c', glowColor: 'rgba(239, 68, 68, 0.6)', badgeBg: 'rgba(185, 28, 28, 0.25)', accentHex: '#ef4444' },
+  neon: { primary: '#ec4899', secondary: '#be185d', glowColor: 'rgba(236, 72, 153, 0.6)', badgeBg: 'rgba(190, 24, 93, 0.25)', accentHex: '#ec4899' },
+  emerald: { primary: '#10b981', secondary: '#047857', glowColor: 'rgba(16, 185, 129, 0.6)', badgeBg: 'rgba(4, 120, 87, 0.3)', accentHex: '#10b981' },
+};
+
+function guessPalette(query: string): BackgroundItem['palette'] {
+  const q = query.toLowerCase();
+  if (q.includes('doom') || q.includes('gothic') || q.includes('dark') || q.includes('castle')) return PALETTE_TEMPLATES.dark;
+  if (q.includes('fire') || q.includes('sunset') || q.includes('gold') || q.includes('warm')) return PALETTE_TEMPLATES.warm;
+  if (q.includes('ice') || q.includes('frost') || q.includes('ocean') || q.includes('water')) return PALETTE_TEMPLATES.cool;
+  if (q.includes('space') || q.includes('galaxy') || q.includes('nebula') || q.includes('cosmic')) return PALETTE_TEMPLATES.cosmic;
+  if (q.includes('blood') || q.includes('war') || q.includes('battle') || q.includes('crimson')) return PALETTE_TEMPLATES.red;
+  if (q.includes('neon') || q.includes('cyber') || q.includes('punk') || q.includes('city')) return PALETTE_TEMPLATES.neon;
+  return PALETTE_TEMPLATES.emerald;
+}
+
+function guessCategory(query: string): UserInterest {
+  const q = query.toLowerCase();
+  if (q.includes('doom') || q.includes('latveria') || q.includes('victor')) return 'doom';
+  if (q.includes('marvel') || q.includes('avenger') || q.includes('iron') || q.includes('hero')) return 'marvel';
+  if (q.includes('secret') || q.includes('war') || q.includes('battleworld')) return 'secretwars';
+  if (q.includes('comic') || q.includes('vintage') || q.includes('retro')) return 'comics';
+  if (q.includes('cyber') || q.includes('neon') || q.includes('future') || q.includes('sci-fi')) return 'cyberpunk';
+  if (q.includes('dark') || q.includes('magic') || q.includes('sorcery') || q.includes('mystic')) return 'darkart';
+  return 'marvel';
+}
+
+/**
+ * Build an intelligent search query from a countdown title + category
+ */
+export function buildSearchQuery(title: string, category: string): string {
+  const titleWords = title.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+  const categoryMap: Record<string, string> = {
+    marvel: 'cinematic dark epic superhero',
+    gaming: 'gaming digital art fantasy',
+    scifi: 'science fiction futuristic space',
+    personal: 'aesthetic wallpaper beautiful landscape',
+    holiday: 'celebration festive lights',
+  };
+  const categoryKeywords = categoryMap[category] || 'cinematic dark art';
+  return `${titleWords} ${categoryKeywords}`.trim();
+}
+
+/**
+ * Fetch artworks from Unsplash API based on a search query
+ */
+export async function fetchArtworksFromWeb(query: string, count: number = 10): Promise<BackgroundItem[]> {
+  const cacheKey = `${query}_${count}`;
+  if (searchCache.has(cacheKey)) {
+    return searchCache.get(cacheKey)!;
+  }
+
+  if (UNSPLASH_ACCESS_KEY) {
+    try {
+      const params = new URLSearchParams({
+        query,
+        per_page: String(count),
+        orientation: 'landscape',
+        content_filter: 'high',
+      });
+
+      const response = await fetch(`${UNSPLASH_API}/search/photos?${params}`, {
+        headers: {
+          Authorization: `Client-ID ${UNSPLASH_ACCESS_KEY}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const results: BackgroundItem[] = data.results.map((photo: {
+          id: string;
+          description?: string;
+          alt_description?: string;
+          urls: { regular: string; full: string };
+          user: { name: string };
+        }) => ({
+          id: `unsplash_${photo.id}`,
+          title: photo.description || photo.alt_description || query,
+          category: guessCategory(query),
+          imageUrl: photo.urls.regular,
+          artistCredit: `Photo by ${photo.user.name} on Unsplash`,
+          description: photo.alt_description || `Artwork matching "${query}"`,
+          palette: guessPalette(query),
+        }));
+
+        searchCache.set(cacheKey, results);
+        return results;
+      }
+    } catch (e) {
+      console.warn('Unsplash API fetch failed, falling back to curated library:', e);
+    }
+  }
+
+  return fetchWebArtworksByInterest(query);
+}
+
+/**
+ * Fetch artworks for a countdown timer based on its title + category
+ */
+export async function fetchArtworksForCountdown(title: string, category: string): Promise<BackgroundItem[]> {
+  const query = buildSearchQuery(title, category);
+  return fetchArtworksFromWeb(query, 12);
+}
+
+// --- STATIC FALLBACK LIBRARY ---
+
 const CURATED_WEB_LIBRARY: Record<string, Omit<BackgroundItem, 'category'>[]> = {
   doom: [
     {
       id: 'web_doom_throne_1',
-      title: 'Victor von Doom: The Latverian Crown',
-      imageUrl: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?q=85&w=2560&auto=format&fit=crop',
-      artistCredit: 'Marvel Studios / Comic Concept',
-      description: 'Doctor Doom seated in his Latverian castle hall surrounded by emerald energy runes.',
-      palette: { primary: '#00ff88', secondary: '#059669', glowColor: 'rgba(0, 255, 136, 0.6)', badgeBg: 'rgba(5, 150, 105, 0.25)', accentHex: '#00ff88' }
+      title: 'Gothic Cathedral of Dark Power',
+      imageUrl: 'https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?q=80&w=1920&auto=format&fit=crop',
+      artistCredit: 'Gothic Architecture Photography',
+      description: 'Dark gothic cathedral interior radiating with ominous emerald energy.',
+      palette: PALETTE_TEMPLATES.dark,
     },
     {
-      id: 'web_doom_mask_2',
-      title: 'Titanium & Sorcery: Mask of Doom',
-      imageUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?q=85&w=2560&auto=format&fit=crop',
-      artistCredit: 'Latverian Armory',
-      description: 'Close-up of Victor von Doom’s legendary mask with glowing emerald optical sensors.',
-      palette: { primary: '#10b981', secondary: '#047857', glowColor: 'rgba(16, 185, 129, 0.6)', badgeBg: 'rgba(4, 120, 87, 0.3)', accentHex: '#10b981' }
+      id: 'web_doom_castle_2',
+      title: 'Fortress of Shadows at Midnight',
+      imageUrl: 'https://images.unsplash.com/photo-1507400492013-162706c8c05e?q=80&w=1920&auto=format&fit=crop',
+      artistCredit: 'Castle Photography',
+      description: 'Ancient castle fortress silhouetted against a foreboding night sky.',
+      palette: PALETTE_TEMPLATES.dark,
     },
     {
-      id: 'web_doom_battleworld_3',
-      title: 'God Emperor Doom: Lord of Battleworld',
-      imageUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?q=85&w=2560&auto=format&fit=crop',
-      artistCredit: 'Secret Wars Art',
-      description: 'God Emperor Doom holding the fragments of colliding multiverses in his hands.',
-      palette: { primary: '#a7f3d0', secondary: '#6ee7b7', glowColor: 'rgba(167, 243, 208, 0.5)', badgeBg: 'rgba(5, 46, 22, 0.3)', accentHex: '#a7f3d0' }
+      id: 'web_doom_emerald_3',
+      title: 'Emerald Aurora of Latverian Sorcery',
+      imageUrl: 'https://images.unsplash.com/photo-1519074069444-1ba4fff66d16?q=80&w=1920&auto=format&fit=crop',
+      artistCredit: 'Aurora Photography',
+      description: 'Green aurora borealis cascading across the frozen northern sky.',
+      palette: PALETTE_TEMPLATES.emerald,
     },
-    {
-      id: 'web_doom_fortress_4',
-      title: 'Castle Doomstadt at Midnight',
-      imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=85&w=2560&auto=format&fit=crop',
-      artistCredit: 'Latverian Royal Architecture',
-      description: 'The towering Gothic spires of Castle Doomstadt under green lightning storms.',
-      palette: { primary: '#34d399', secondary: '#059669', glowColor: 'rgba(52, 211, 153, 0.55)', badgeBg: 'rgba(5, 150, 105, 0.25)', accentHex: '#34d399' }
-    }
   ],
   marvel: [
     {
-      id: 'web_marvel_incursion_1',
-      title: 'Avengers: Incursion Impending',
-      imageUrl: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=85&w=2560&auto=format&fit=crop',
-      artistCredit: 'MCU Concept Art',
-      description: 'Earth-616 and Earth-838 colliding in the sky as the Avengers prepare their final stand.',
-      palette: { primary: '#38bdf8', secondary: '#0284c7', glowColor: 'rgba(56, 189, 248, 0.6)', badgeBg: 'rgba(2, 132, 199, 0.3)', accentHex: '#38bdf8' }
+      id: 'web_marvel_storm_1',
+      title: 'Doomsday Lightning Storm',
+      imageUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=1920&auto=format&fit=crop',
+      artistCredit: 'Storm Photography',
+      description: 'Apocalyptic lightning storm splitting the dark sky with raw cosmic power.',
+      palette: PALETTE_TEMPLATES.cool,
     },
     {
-      id: 'web_marvel_ironman_2',
-      title: 'Stark Arc Reactor Core Tech',
-      imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=85&w=2560&auto=format&fit=crop',
-      artistCredit: 'Stark Industries Blueprints',
-      description: 'Nanotech vibranium armor charging high-output unibeam bursts.',
-      palette: { primary: '#f59e0b', secondary: '#b45309', glowColor: 'rgba(245, 158, 11, 0.6)', badgeBg: 'rgba(180, 83, 9, 0.25)', accentHex: '#f59e0b' }
+      id: 'web_marvel_nebula_2',
+      title: 'Multiversal Incursion Nebula',
+      imageUrl: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?q=80&w=1920&auto=format&fit=crop',
+      artistCredit: 'NASA / Space Photography',
+      description: 'Deep space nebula as two multiversal incursion points converge.',
+      palette: PALETTE_TEMPLATES.cosmic,
     },
     {
-      id: 'web_marvel_tva_3',
-      title: 'TVA: The Sacred Timeline',
-      imageUrl: 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?q=85&w=2560&auto=format&fit=crop',
-      artistCredit: 'Time Variance Authority',
-      description: 'Looming golden temporal fibers stretching into infinity across branches.',
-      palette: { primary: '#fbbf24', secondary: '#d97706', glowColor: 'rgba(251, 191, 36, 0.6)', badgeBg: 'rgba(217, 119, 6, 0.3)', accentHex: '#fbbf24' }
-    }
+      id: 'web_marvel_earth_3',
+      title: 'Earth-616 from the Quantum Realm',
+      imageUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1920&auto=format&fit=crop',
+      artistCredit: 'NASA Earth Observatory',
+      description: 'Planet Earth glowing in the darkness of space.',
+      palette: PALETTE_TEMPLATES.cool,
+    },
   ],
   comics: [
     {
-      id: 'web_comic_vintage_1',
-      title: 'Classic Marvel Vintage Splash Cover',
-      imageUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?q=85&w=2560&auto=format&fit=crop',
-      artistCredit: 'Vintage Comic Art',
-      description: 'Authentic 1970s Ben-Day dots, heavy ink line work, and dramatic comic title banner.',
-      palette: { primary: '#ef4444', secondary: '#b91c1c', glowColor: 'rgba(239, 68, 68, 0.6)', badgeBg: 'rgba(185, 28, 28, 0.25)', accentHex: '#ef4444' }
+      id: 'web_comic_abstract_1',
+      title: 'Pop Art Explosion',
+      imageUrl: 'https://images.unsplash.com/photo-1618005198919-d3d4b5a92ead?q=80&w=1920&auto=format&fit=crop',
+      artistCredit: 'Abstract Art Photography',
+      description: 'Bold abstract pop art colors reminiscent of classic comic splash pages.',
+      palette: PALETTE_TEMPLATES.red,
     },
     {
-      id: 'web_comic_secretwars_2',
-      title: 'Secret Wars #1 Iconic Clash',
-      imageUrl: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?q=85&w=2560&auto=format&fit=crop',
-      artistCredit: 'Marvel Comics Heritage',
-      description: 'Heroes and villains facing off against the Beyonder on the fragmented surface of Battleworld.',
-      palette: { primary: '#00ff88', secondary: '#059669', glowColor: 'rgba(0, 255, 136, 0.6)', badgeBg: 'rgba(5, 150, 105, 0.25)', accentHex: '#00ff88' }
-    }
+      id: 'web_comic_fluid_2',
+      title: 'Ink Flow: Comic Book Genesis',
+      imageUrl: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?q=80&w=1920&auto=format&fit=crop',
+      artistCredit: 'Fluid Art Photography',
+      description: 'Vivid fluid art swirls reminiscent of cosmic comic book energy blasts.',
+      palette: PALETTE_TEMPLATES.neon,
+    },
   ],
-  cyberpunk: [
+  secretwars: [
     {
-      id: 'web_cyber_neo_1',
-      title: 'Neo-Latveria 2099 Cyber Grid',
-      imageUrl: 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?q=85&w=2560&auto=format&fit=crop',
-      artistCredit: 'Cyberpunk Concept Art',
-      description: 'Towering neon skytowers and holographic ads cutting through acid rain.',
-      palette: { primary: '#ec4899', secondary: '#be185d', glowColor: 'rgba(236, 72, 153, 0.6)', badgeBg: 'rgba(190, 24, 93, 0.25)', accentHex: '#ec4899' }
-    }
+      id: 'web_sw_galaxy_1',
+      title: 'Battleworld: Fragmented Galaxy',
+      imageUrl: 'https://images.unsplash.com/photo-1464802686167-b939a6910659?q=80&w=1920&auto=format&fit=crop',
+      artistCredit: 'Galaxy Photography',
+      description: 'A swirling galaxy representing fractured remains of Battleworld.',
+      palette: PALETTE_TEMPLATES.cosmic,
+    },
+    {
+      id: 'web_sw_planet_2',
+      title: "The Beyonder's Domain",
+      imageUrl: 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?q=80&w=1920&auto=format&fit=crop',
+      artistCredit: 'NASA / Planetary Science',
+      description: 'A lone planet orbiting in the void between collapsed multiversal realms.',
+      palette: PALETTE_TEMPLATES.cool,
+    },
   ],
   darkart: [
     {
-      id: 'web_dark_sanctum_1',
-      title: 'The Arcane Crypt of Agamotto',
-      imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=85&w=2560&auto=format&fit=crop',
-      artistCredit: 'Mystic Order',
-      description: 'Ancient occult runes burning in blood red across granite crypt arches.',
-      palette: { primary: '#f87171', secondary: '#dc2626', glowColor: 'rgba(248, 113, 113, 0.6)', badgeBg: 'rgba(220, 38, 38, 0.25)', accentHex: '#f87171' }
-    }
-  ]
+      id: 'web_dark_forest_1',
+      title: 'Sanctum of the Darkhold',
+      imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1920&auto=format&fit=crop',
+      artistCredit: 'Dark Forest Photography',
+      description: 'An ancient dark forest where the Darkhold grimoire was first inscribed.',
+      palette: PALETTE_TEMPLATES.dark,
+    },
+  ],
+  cyberpunk: [
+    {
+      id: 'web_cyber_city_1',
+      title: 'Neo-Latveria 2099',
+      imageUrl: 'https://images.unsplash.com/photo-1515705576963-95cad62945b6?q=80&w=1920&auto=format&fit=crop',
+      artistCredit: 'Night City Photography',
+      description: 'Towering neon-drenched skyscrapers of Neo-Latveria in the year 2099.',
+      palette: PALETTE_TEMPLATES.neon,
+    },
+    {
+      id: 'web_cyber_neon_2',
+      title: 'Holographic Data Grid',
+      imageUrl: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=1920&auto=format&fit=crop',
+      artistCredit: 'Digital Art',
+      description: 'A pulsing gradient field of holographic data cascading through cyberspace.',
+      palette: PALETTE_TEMPLATES.neon,
+    },
+  ],
 };
 
 /**
- * Searches and fetches accurate web artworks based on user interest or custom search query.
+ * Searches the static curated library based on keyword matching
  */
 export function fetchWebArtworksByInterest(interestQuery: string): BackgroundItem[] {
   const q = interestQuery.toLowerCase().trim();
-
-  // Keyword matching
   let matchedKeys: string[] = [];
 
-  if (q.includes('doom') || q.includes('latveria') || q.includes('victor')) {
+  if (q.includes('doom') || q.includes('latveria') || q.includes('victor') || q.includes('gothic') || q.includes('castle')) {
     matchedKeys.push('doom');
   }
-  if (q.includes('marvel') || q.includes('avenger') || q.includes('doomsday') || q.includes('mcu') || q.includes('iron') || q.includes('stark')) {
+  if (q.includes('marvel') || q.includes('avenger') || q.includes('doomsday') || q.includes('mcu') || q.includes('iron') || q.includes('stark') || q.includes('hero')) {
     matchedKeys.push('marvel');
   }
-  if (q.includes('comic') || q.includes('secret') || q.includes('war') || q.includes('kirby') || q.includes('cover')) {
+  if (q.includes('comic') || q.includes('secret') || q.includes('war') || q.includes('kirby') || q.includes('cover') || q.includes('art')) {
     matchedKeys.push('comics');
   }
-  if (q.includes('cyber') || q.includes('neon') || q.includes('city') || q.includes('future')) {
+  if (q.includes('cyber') || q.includes('neon') || q.includes('city') || q.includes('future') || q.includes('sci') || q.includes('tech')) {
     matchedKeys.push('cyberpunk');
   }
-  if (q.includes('dark') || q.includes('magic') || q.includes('rune') || q.includes('sorcery')) {
+  if (q.includes('dark') || q.includes('magic') || q.includes('rune') || q.includes('sorcery') || q.includes('mystic')) {
     matchedKeys.push('darkart');
+  }
+  if (q.includes('secret') || q.includes('battleworld') || q.includes('space') || q.includes('galaxy') || q.includes('cosmic')) {
+    matchedKeys.push('secretwars');
   }
 
   if (matchedKeys.length === 0) {
-    matchedKeys = ['doom', 'marvel'];
+    matchedKeys = ['doom', 'marvel', 'comics'];
   }
 
   const results: BackgroundItem[] = [];
+  const seen = new Set<string>();
   matchedKeys.forEach(k => {
     const list = CURATED_WEB_LIBRARY[k] || [];
     list.forEach(item => {
-      results.push({
-        ...item,
-        category: 'doom',
-      });
+      if (!seen.has(item.id)) {
+        seen.add(item.id);
+        results.push({ ...item, category: guessCategory(k) });
+      }
     });
   });
 

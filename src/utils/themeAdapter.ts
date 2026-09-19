@@ -16,7 +16,15 @@ export type ClockStylePreset =
   | 'bloodmoon'
   | 'bifrost'
   | 'darkhold'
-  | 'retrocomic';
+  | 'retrocomic'
+  | 'wakanda_sunset'
+  | 'kang_dynasty'
+  | 'galactus_nebula'
+  | 'midnight_noir'
+  | 'sakura_zen'
+  | 'cosmic_void'
+  | 'electric_storm'
+  | 'phantom_stealth';
 
 export interface ClockTheme {
   name: string;
@@ -234,6 +242,94 @@ export const CLOCK_PRESETS: Record<ClockStylePreset, PresetInfo> = {
     fontFamily: 'Montserrat',
     titleFontFamily: 'Montserrat',
     tag: 'Retro Ink',
+  },
+  wakanda_sunset: {
+    label: 'Wakanda Sunset',
+    desc: 'Warm amber with deep purple accents',
+    icon: '🌅',
+    primary: '#f59e0b',
+    secondary: '#7e22ce',
+    titleColor: '#f59e0b',
+    fontFamily: 'Cinzel',
+    titleFontFamily: 'Cinzel',
+    tag: 'Wakanda',
+  },
+  kang_dynasty: {
+    label: 'Kang Dynasty',
+    desc: 'Cold steel blue with violet',
+    icon: '⏳',
+    primary: '#60a5fa',
+    secondary: '#8b5cf6',
+    titleColor: '#60a5fa',
+    fontFamily: 'Share Tech Mono',
+    titleFontFamily: 'Share Tech Mono',
+    tag: 'Multiverse',
+  },
+  galactus_nebula: {
+    label: 'Galactus Nebula',
+    desc: 'Deep cosmic purple with burning orange',
+    icon: '🌌',
+    primary: '#a855f7',
+    secondary: '#f97316',
+    titleColor: '#a855f7',
+    fontFamily: 'Orbitron',
+    titleFontFamily: 'Orbitron',
+    tag: 'Cosmic',
+  },
+  midnight_noir: {
+    label: 'Midnight Noir',
+    desc: 'Pure white on black with silver',
+    icon: '🕵️',
+    primary: '#ffffff',
+    secondary: '#94a3b8',
+    titleColor: '#ffffff',
+    fontFamily: 'Montserrat',
+    titleFontFamily: 'Montserrat',
+    tag: 'Noir',
+  },
+  sakura_zen: {
+    label: 'Sakura Zen',
+    desc: 'Soft cherry blossom pink with cream',
+    icon: '🌸',
+    primary: '#f9a8d4',
+    secondary: '#fef3c7',
+    titleColor: '#f9a8d4',
+    fontFamily: 'Cinzel',
+    titleFontFamily: 'Cinzel',
+    tag: 'Zen',
+  },
+  cosmic_void: {
+    label: 'Cosmic Void',
+    desc: 'Abyssal blue-white with deep navy',
+    icon: '☄️',
+    primary: '#e0f2fe',
+    secondary: '#1e3a5f',
+    titleColor: '#e0f2fe',
+    fontFamily: 'Rajdhani',
+    titleFontFamily: 'Rajdhani',
+    tag: 'Cosmic',
+  },
+  electric_storm: {
+    label: 'Electric Storm',
+    desc: 'Electric blue with white',
+    icon: '⚡',
+    primary: '#3b82f6',
+    secondary: '#ffffff',
+    titleColor: '#3b82f6',
+    fontFamily: 'Share Tech Mono',
+    titleFontFamily: 'Share Tech Mono',
+    tag: 'Storm',
+  },
+  phantom_stealth: {
+    label: 'Phantom Stealth',
+    desc: 'Military olive with dark accents',
+    icon: '🥷',
+    primary: '#84cc16',
+    secondary: '#1a2e05',
+    titleColor: '#84cc16',
+    fontFamily: 'Rajdhani',
+    titleFontFamily: 'Rajdhani',
+    tag: 'Stealth',
   },
 };
 

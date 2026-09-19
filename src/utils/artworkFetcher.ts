@@ -4,7 +4,7 @@
 
 import type { BackgroundItem, UserInterest } from '../data/curatedBackgrounds';
 
-const UNSPLASH_ACCESS_KEY = import.meta.env.VITE_UNSPLASH_ACCESS_KEY || '';
+const UNSPLASH_ACCESS_KEY = import.meta.env.VITE_UNSPLASH_ACCESS_KEY || 'zrZf5CuQgZhBsDc00c4L9JzXZvKhz2BAV_zyuEosHt4';
 const UNSPLASH_API = 'https://api.unsplash.com';
 
 // Cache to avoid redundant API calls within a session

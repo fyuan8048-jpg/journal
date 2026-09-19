@@ -5,15 +5,15 @@ import { getFirestore } from 'firebase/firestore';
 // TODO: Replace with your Firebase project credentials
 // Go to https://console.firebase.google.com → Create Project → Web App → Copy config
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'YOUR_API_KEY',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'YOUR_PROJECT.firebaseapp.com',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'YOUR_PROJECT_ID',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'YOUR_PROJECT.appspot.com',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '000000000000',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:000000000000:web:0000000000000000000000',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyAt8iKzgWF9xNWHs5glrYDIzTjZ8_UW5ws',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'journal-clock.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'journal-clock',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'journal-clock.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '553151449502',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:553151449502:web:19b26dd932e557eb202e8f',
 };
 
-const isFirebaseConfigured = firebaseConfig.apiKey !== 'YOUR_API_KEY' && !!import.meta.env.VITE_FIREBASE_API_KEY;
+const isFirebaseConfigured = true;
 
 let app: ReturnType<typeof initializeApp> | null = null;
 let auth: ReturnType<typeof getAuth> | null = null;

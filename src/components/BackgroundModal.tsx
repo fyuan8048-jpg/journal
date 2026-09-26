@@ -18,6 +18,7 @@ import { CURATED_BACKGROUNDS, type BackgroundItem, getDailyBackground } from '..
 import { useAuth } from '../context/AuthContext';
 import { soundEngine } from '../audio/soundEngine';
 import { fetchArtworksForCountdown, fetchArtworksFromWeb } from '../utils/artworkFetcher';
+import { compressImage, storeImageBlob } from '../utils/mediaStorage';
 
 interface BackgroundModalProps {
   isOpen: boolean;
@@ -61,6 +62,7 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
   const [collectionName] = useState('My Wallpapers');
   const [uploadError, setUploadError] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
 
   // Web Art Discovery State
   const [webArtworks, setWebArtworks] = useState<BackgroundItem[]>([]);
@@ -202,8 +204,8 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
     setUploadError('');
   };
 
-  // Handle File Upload
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle File Upload with automatic compression and local IndexedDB persistence
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -212,27 +214,43 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
       return;
     }
 
-    if (file.size > 8 * 1024 * 1024) {
-      setUploadError('File exceeds 8MB limit. Please use a smaller image.');
+    if (file.size > 20 * 1024 * 1024) {
+      setUploadError('File exceeds 20MB limit. Please choose a smaller image.');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
+    setIsUploadingFile(true);
+    setUploadError('');
+
+    try {
       const title = file.name.replace(/\.[^/.]+$/, '');
+      const imageId = `img_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
+      // Compress to high-quality 1080p WebP
+      const { blob, thumbnailDataUrl } = await compressImage(file);
+
+      // Store raw blob in local IndexedDB (zero impact on Firestore / localStorage limits)
+      const storageKey = await storeImageBlob(imageId, blob);
+      const displayUrl = URL.createObjectURL(blob);
+
       addCustomImage({
+        id: imageId,
         name: title,
-        url: dataUrl,
+        url: displayUrl,
         collectionName: collectionName.trim() || 'Uploaded Wallpapers',
+        storageKey,
+        thumbnailDataUrl,
       });
-      handleSelectCustom(dataUrl, title);
-      setUploadError('');
-    };
-    reader.onerror = () => {
-      setUploadError('Failed to read file');
-    };
-    reader.readAsDataURL(file);
+
+      handleSelectCustom(displayUrl, title);
+      showToast(`✓ Uploaded & applied: ${title}`);
+    } catch (err) {
+      console.error('Failed to process uploaded file:', err);
+      setUploadError('Failed to process image. Please try another file.');
+    } finally {
+      setIsUploadingFile(false);
+      e.target.value = '';
+    }
   };
 
   return (
@@ -667,12 +685,20 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
                 <div className="p-5 rounded-2xl bg-white/5 border border-white/10 hover:border-emerald-500/40 transition-colors flex flex-col justify-center items-center text-center relative overflow-hidden">
                   <Upload className="w-8 h-8 text-emerald-400 mb-2" />
                   <p className="text-sm font-bold text-white mb-1">Upload from Device</p>
-                  <p className="text-xs text-neutral-400 mb-4">PNG, JPG, WebP up to 8MB</p>
-                  <label className="cursor-pointer px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow">
-                    Choose Image
+                  <p className="text-xs text-neutral-400 mb-4">PNG, JPG, WebP up to 20MB</p>
+                  <label className={`cursor-pointer px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow flex items-center gap-1.5 ${isUploadingFile ? 'opacity-75 pointer-events-none' : ''}`}>
+                    {isUploadingFile ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Optimizing &amp; Saving...</span>
+                      </>
+                    ) : (
+                      <span>Choose Image</span>
+                    )}
                     <input
                       type="file"
                       accept="image/*"
+                      disabled={isUploadingFile}
                       onChange={handleFileUpload}
                       className="hidden"
                     />

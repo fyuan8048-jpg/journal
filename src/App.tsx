@@ -69,12 +69,46 @@ function AppContent() {
     preferences?.clockCustomSettings || DEFAULT_CLOCK_CUSTOM_SETTINGS
   );
 
+  // Synchronize clock preset theme when preferences update from cloud / login
+  useEffect(() => {
+    if (preferences?.clockPreset) {
+      setClockPreset(preferences.clockPreset);
+    }
+  }, [preferences?.clockPreset]);
+
+  // Synchronize includeYears when preferences update
+  useEffect(() => {
+    if (typeof preferences?.includeYears === 'boolean') {
+      setIncludeYears(preferences.includeYears);
+    }
+  }, [preferences?.includeYears]);
+
   // Sync customSettings if preferences update
   useEffect(() => {
     if (preferences?.clockCustomSettings) {
       setCustomSettings(preferences.clockCustomSettings);
     }
   }, [preferences?.clockCustomSettings]);
+
+  // Synchronize audio preferences when user profile loads from cloud
+  useEffect(() => {
+    if (preferences?.volume !== undefined) {
+      setClockVolume(preferences.volume);
+      soundEngine.setClockVolume(preferences.volume);
+    }
+    if (preferences?.isMuted !== undefined) {
+      setIsClockMuted(preferences.isMuted);
+      soundEngine.setClockMuted(preferences.isMuted);
+    }
+    if (preferences?.soundType) {
+      setSoundType(preferences.soundType);
+      soundEngine.setSoundType(preferences.soundType);
+    }
+    if (preferences?.ambientDrone !== undefined) {
+      setAmbientDrone(preferences.ambientDrone);
+      soundEngine.toggleDrone(preferences.ambientDrone);
+    }
+  }, [preferences?.volume, preferences?.isMuted, preferences?.soundType, preferences?.ambientDrone]);
 
   const handleUpdateCustomSettings = (newSettings: ClockCustomSettings) => {
     setCustomSettings(newSettings);
@@ -135,24 +169,23 @@ function AppContent() {
     }
   }, [preferences?.autoRotate24h, activeCustomUrl]);
 
-  // Update daily background when user preferences change
+  // Synchronize active wallpaper whenever preferences update from cloud / storage
   useEffect(() => {
-    if (!activeCustomUrl) {
+    if (preferences?.activeCustomImageUrl) {
+      setActiveCustomUrl(preferences.activeCustomImageUrl);
+    } else {
+      setActiveCustomUrl(undefined);
+      if (preferences?.activeBackgroundId) {
+        const found = CURATED_BACKGROUNDS.find(b => b.id === preferences.activeBackgroundId);
+        if (found) {
+          setActiveBackground(found);
+          return;
+        }
+      }
       const daily = getDailyBackground(preferences?.interests || ['doom', 'marvel'], 0);
       setActiveBackground(daily);
     }
-  }, [preferences?.interests]);
-
-  // Synchronize active wallpaper whenever preferences change in storage
-  useEffect(() => {
-    setActiveCustomUrl(preferences?.activeCustomImageUrl);
-    if (preferences?.activeBackgroundId) {
-      const found = CURATED_BACKGROUNDS.find(b => b.id === preferences.activeBackgroundId);
-      if (found) {
-        setActiveBackground(found);
-      }
-    }
-  }, [preferences?.activeCustomImageUrl, preferences?.activeBackgroundId]);
+  }, [preferences?.activeCustomImageUrl, preferences?.activeBackgroundId, preferences?.interests]);
 
   // Fullscreen change listener & ESC handler
   useEffect(() => {

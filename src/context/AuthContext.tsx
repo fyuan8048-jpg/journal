@@ -20,6 +20,11 @@ import {
   signInWithPopup
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import {
+  sanitizeProfileForFirestore,
+  restoreImagesFromStorage,
+  deleteImageBlob,
+} from '../utils/mediaStorage';
 
 export interface UserCustomImage {
   id: string;
@@ -27,6 +32,8 @@ export interface UserCustomImage {
   url: string;
   collectionName: string;
   addedAt: number;
+  storageKey?: string;
+  thumbnailDataUrl?: string;
 }
 
 export interface UserProfile {
@@ -63,7 +70,7 @@ interface AuthContextType {
   signup: (email: string, password: string, username: string, avatar?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   updatePreferences: (partial: Partial<UserProfile['preferences']>) => void;
-  addCustomImage: (img: Omit<UserCustomImage, 'id' | 'addedAt'>) => void;
+  addCustomImage: (img: Omit<UserCustomImage, 'id' | 'addedAt'> & { id?: string }) => void;
   removeCustomImage: (id: string) => void;
   addCustomCountdown: (event: CountdownEvent) => void;
   updateCountdown: (event: CountdownEvent) => void;
@@ -155,6 +162,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
             const profile = docSnap.data() as UserProfile;
+            if (profile.preferences?.customImages) {
+              profile.preferences.customImages = await restoreImagesFromStorage(profile.preferences.customImages);
+              if (profile.preferences.activeCustomImageUrl) {
+                const activeImg = profile.preferences.customImages.find(
+                  i => i.id === profile.preferences.activeCustomImageUrl || i.storageKey === profile.preferences.activeCustomImageUrl || i.url === profile.preferences.activeCustomImageUrl
+                );
+                if (activeImg) {
+                  profile.preferences.activeCustomImageUrl = activeImg.url;
+                }
+              }
+            }
             setCurrentUser(profile);
             setUsersList(prev => {
               const list = [...prev];
@@ -176,7 +194,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const firestore = db;
     if (isFirebaseConfigured && auth?.currentUser && firestore && profile.id !== 'guest') {
       try {
-        await setDoc(doc(firestore, 'users', profile.id), profile);
+        const sanitized = sanitizeProfileForFirestore(profile);
+        await setDoc(doc(firestore, 'users', profile.id), sanitized);
       } catch (e) {
         console.error('Failed to save to Firestore:', e);
       }
@@ -185,10 +204,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY_CURRENT, JSON.stringify(currentUser));
-      const updatedList = usersList.map(u => u.id === currentUser.id ? currentUser : u);
+      const sanitized = sanitizeProfileForFirestore(currentUser);
+      localStorage.setItem(STORAGE_KEY_CURRENT, JSON.stringify(sanitized));
+      const updatedList = usersList.map(u => u.id === currentUser.id ? sanitized : u);
       if (!updatedList.some(u => u.id === currentUser.id)) {
-        updatedList.push(currentUser);
+        updatedList.push(sanitized);
       }
       localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(updatedList));
       setUsersList(updatedList);
@@ -205,7 +225,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isFirebaseConfigured && auth) {
       if (!password) return { success: false, error: 'Please enter your password' };
       try {
-        await signInWithEmailAndPassword(auth, query, password);
+        const cred = await signInWithEmailAndPassword(auth, query, password);
+        const firestore = db;
+        if (firestore) {
+          const docRef = doc(firestore, 'users', cred.user.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const profile = docSnap.data() as UserProfile;
+            if (profile.preferences?.customImages) {
+              profile.preferences.customImages = await restoreImagesFromStorage(profile.preferences.customImages);
+              if (profile.preferences.activeCustomImageUrl) {
+                const activeImg = profile.preferences.customImages.find(
+                  i => i.id === profile.preferences.activeCustomImageUrl || i.storageKey === profile.preferences.activeCustomImageUrl || i.url === profile.preferences.activeCustomImageUrl
+                );
+                if (activeImg) {
+                  profile.preferences.activeCustomImageUrl = activeImg.url;
+                }
+              }
+            }
+            setCurrentUser(profile);
+          }
+        }
         return { success: true };
       } catch (e: any) {
         return { success: false, error: e.message || 'Firebase login failed' };
@@ -322,10 +362,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           createdAt: Date.now(),
           preferences: { ...DEFAULT_GUEST.preferences },
         };
-        await setDoc(docRef, newUser);
+        await setDoc(docRef, sanitizeProfileForFirestore(newUser));
         setCurrentUser(newUser);
       } else {
-        setCurrentUser(docSnap.data() as UserProfile);
+        const profile = docSnap.data() as UserProfile;
+        if (profile.preferences?.customImages) {
+          profile.preferences.customImages = await restoreImagesFromStorage(profile.preferences.customImages);
+          if (profile.preferences.activeCustomImageUrl) {
+            const activeImg = profile.preferences.customImages.find(
+              i => i.id === profile.preferences.activeCustomImageUrl || i.storageKey === profile.preferences.activeCustomImageUrl || i.url === profile.preferences.activeCustomImageUrl
+            );
+            if (activeImg) {
+              profile.preferences.activeCustomImageUrl = activeImg.url;
+            }
+          }
+        }
+        setCurrentUser(profile);
       }
       return { success: true };
     } catch (e: any) {
@@ -337,23 +389,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCurrentUser(prev => ({ ...prev, preferences: { ...prev.preferences, ...partial } }));
   };
 
-  const addCustomImage = (img: Omit<UserCustomImage, 'id' | 'addedAt'>) => {
+  const addCustomImage = (img: Omit<UserCustomImage, 'id' | 'addedAt'> & { id?: string }) => {
     const newImage: UserCustomImage = {
       ...img,
-      id: `img_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: img.id || `img_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       addedAt: Date.now(),
     };
     setCurrentUser(prev => ({
       ...prev,
       preferences: {
         ...prev.preferences,
-        customImages: [newImage, ...prev.preferences.customImages],
+        customImages: [newImage, ...prev.preferences.customImages.filter(i => i.id !== newImage.id)],
         activeCustomImageUrl: newImage.url,
       }
     }));
   };
 
   const removeCustomImage = (id: string) => {
+    deleteImageBlob(id).catch(console.warn);
     setCurrentUser(prev => {
       const filtered = prev.preferences.customImages.filter(img => img.id !== id);
       const isCurrentActive = prev.preferences.activeCustomImageUrl === prev.preferences.customImages.find(i => i.id === id)?.url;

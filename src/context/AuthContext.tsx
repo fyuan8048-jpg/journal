@@ -228,22 +228,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const cred = await signInWithEmailAndPassword(auth, query, password);
         const firestore = db;
         if (firestore) {
-          const docRef = doc(firestore, 'users', cred.user.uid);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
-            const profile = docSnap.data() as UserProfile;
-            if (profile.preferences?.customImages) {
-              profile.preferences.customImages = await restoreImagesFromStorage(profile.preferences.customImages);
-              if (profile.preferences.activeCustomImageUrl) {
-                const activeImg = profile.preferences.customImages.find(
-                  i => i.id === profile.preferences.activeCustomImageUrl || i.storageKey === profile.preferences.activeCustomImageUrl || i.url === profile.preferences.activeCustomImageUrl
-                );
-                if (activeImg) {
-                  profile.preferences.activeCustomImageUrl = activeImg.url;
+          try {
+            const docRef = doc(firestore, 'users', cred.user.uid);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+              const profile = docSnap.data() as UserProfile;
+              if (profile.preferences?.customImages) {
+                profile.preferences.customImages = await restoreImagesFromStorage(profile.preferences.customImages);
+                if (profile.preferences.activeCustomImageUrl) {
+                  const activeImg = profile.preferences.customImages.find(
+                    i => i.id === profile.preferences.activeCustomImageUrl || i.storageKey === profile.preferences.activeCustomImageUrl || i.url === profile.preferences.activeCustomImageUrl
+                  );
+                  if (activeImg) {
+                    profile.preferences.activeCustomImageUrl = activeImg.url;
+                  }
                 }
               }
+              setCurrentUser(profile);
+            } else {
+              const newProfile: UserProfile = {
+                id: cred.user.uid,
+                username: cred.user.displayName || query.split('@')[0] || 'Operative',
+                email: cred.user.email || query,
+                avatar: '👑',
+                createdAt: Date.now(),
+                preferences: { ...DEFAULT_GUEST.preferences },
+              };
+              setCurrentUser(newProfile);
             }
-            setCurrentUser(profile);
+          } catch (fsErr) {
+            console.warn('Firestore profile read permission warning:', fsErr);
+            setCurrentUser({
+              ...DEFAULT_GUEST,
+              id: cred.user.uid,
+              email: cred.user.email || query,
+              username: cred.user.displayName || query.split('@')[0] || 'Operative',
+            });
           }
         }
         return { success: true };
@@ -299,7 +319,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           createdAt: Date.now(),
           preferences: { ...DEFAULT_GUEST.preferences },
         };
-        await setDoc(doc(firestore, 'users', newUser.id), newUser);
+        try {
+          await setDoc(doc(firestore, 'users', newUser.id), sanitizeProfileForFirestore(newUser));
+        } catch (fsErr) {
+          console.warn('Firestore doc write permission warning:', fsErr);
+        }
         setCurrentUser(newUser);
         return { success: true };
       } catch (e: any) {
@@ -350,34 +374,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const result = await signInWithPopup(authInstance, provider);
       const user = result.user;
       
-      const docRef = doc(firestore, 'users', user.uid);
-      const docSnap = await getDoc(docRef);
-      
-      if (!docSnap.exists()) {
-        const newUser: UserProfile = {
-          id: user.uid,
-          username: user.displayName || 'Google Operative',
-          email: user.email || '',
-          avatar: DEFAULT_AVATARS[0],
-          createdAt: Date.now(),
-          preferences: { ...DEFAULT_GUEST.preferences },
-        };
-        await setDoc(docRef, sanitizeProfileForFirestore(newUser));
-        setCurrentUser(newUser);
-      } else {
-        const profile = docSnap.data() as UserProfile;
-        if (profile.preferences?.customImages) {
-          profile.preferences.customImages = await restoreImagesFromStorage(profile.preferences.customImages);
-          if (profile.preferences.activeCustomImageUrl) {
-            const activeImg = profile.preferences.customImages.find(
-              i => i.id === profile.preferences.activeCustomImageUrl || i.storageKey === profile.preferences.activeCustomImageUrl || i.url === profile.preferences.activeCustomImageUrl
-            );
-            if (activeImg) {
-              profile.preferences.activeCustomImageUrl = activeImg.url;
+      try {
+        const docRef = doc(firestore, 'users', user.uid);
+        const docSnap = await getDoc(docRef);
+        
+        if (!docSnap.exists()) {
+          const newUser: UserProfile = {
+            id: user.uid,
+            username: user.displayName || 'Google Operative',
+            email: user.email || '',
+            avatar: DEFAULT_AVATARS[0],
+            createdAt: Date.now(),
+            preferences: { ...DEFAULT_GUEST.preferences },
+          };
+          try {
+            await setDoc(docRef, sanitizeProfileForFirestore(newUser));
+          } catch (writeErr) {
+            console.warn('Firestore user doc write warning:', writeErr);
+          }
+          setCurrentUser(newUser);
+        } else {
+          const profile = docSnap.data() as UserProfile;
+          if (profile.preferences?.customImages) {
+            profile.preferences.customImages = await restoreImagesFromStorage(profile.preferences.customImages);
+            if (profile.preferences.activeCustomImageUrl) {
+              const activeImg = profile.preferences.customImages.find(
+                i => i.id === profile.preferences.activeCustomImageUrl || i.storageKey === profile.preferences.activeCustomImageUrl || i.url === profile.preferences.activeCustomImageUrl
+              );
+              if (activeImg) {
+                profile.preferences.activeCustomImageUrl = activeImg.url;
+              }
             }
           }
+          setCurrentUser(profile);
         }
-        setCurrentUser(profile);
+      } catch (fsErr) {
+        console.warn('Firestore profile read/write permission warning:', fsErr);
+        setCurrentUser({
+          ...DEFAULT_GUEST,
+          id: user.uid,
+          email: user.email || '',
+          username: user.displayName || 'Google Operative',
+        });
       }
       return { success: true };
     } catch (e: any) {

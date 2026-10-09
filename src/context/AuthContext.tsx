@@ -189,6 +189,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           let activeUrl = currentUser.preferences.activeCustomImageUrl;
           const activeId = currentUser.preferences.activeCustomImageId;
           let isVideo = currentUser.preferences.activeCustomMediaIsVideo;
+          let isYouTube = currentUser.preferences.activeCustomMediaIsYouTube;
+          let youTubeId = currentUser.preferences.activeCustomMediaYouTubeId;
           if (activeId || activeUrl) {
             const matched = restored.find(
               i => (activeId && i.id === activeId) ||
@@ -197,6 +199,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (matched) {
               activeUrl = matched.url;
               if (matched.isVideo !== undefined) isVideo = matched.isVideo;
+              if (matched.isYouTube !== undefined) isYouTube = matched.isYouTube;
+              if (matched.youTubeId) youTubeId = matched.youTubeId;
             }
           }
           setCurrentUser(prev => ({
@@ -206,6 +210,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               customImages: restored,
               activeCustomImageUrl: activeUrl,
               activeCustomMediaIsVideo: isVideo,
+              activeCustomMediaIsYouTube: isYouTube,
+              activeCustomMediaYouTubeId: youTubeId,
             }
           }));
         }

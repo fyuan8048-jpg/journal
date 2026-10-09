@@ -28,7 +28,7 @@ interface BackgroundModalProps {
   activeBackground: BackgroundItem;
   setActiveBackground: (bg: BackgroundItem) => void;
   activeCustomUrl?: string;
-  setActiveCustomUrl: (url: string | undefined) => void;
+  setActiveCustomUrl: (url: string | undefined, mediaMeta?: { isVideo?: boolean; isYouTube?: boolean; youTubeId?: string; name?: string }) => void;
   initialTab?: TabType;
   activeCountdown?: { id: string; title: string; category?: string };
 }
@@ -64,6 +64,7 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
   const [uploadError, setUploadError] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [curatedFilter, setCuratedFilter] = useState<'all' | 'video' | 'youtube' | UserInterest>('all');
 
   // Web Art Discovery State
   const [webArtworks, setWebArtworks] = useState<BackgroundItem[]>([]);
@@ -128,11 +129,11 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
 
   // Unified Wallpaper & Video Activators
   const handleSelectCustom = (url: string, name?: string, isVideo?: boolean, isYouTube?: boolean, youTubeId?: string) => {
-    setActiveCustomUrl(url);
     const matched = customImages.find(i => i.url === url || i.id === url);
     const finalIsYouTube = isYouTube !== undefined ? isYouTube : Boolean(matched?.isYouTube);
     const finalYouTubeId = youTubeId || matched?.youTubeId;
     const finalIsVideo = isVideo !== undefined ? isVideo : Boolean(matched?.isVideo || finalIsYouTube || url.match(/\.(mp4|webm|mov|mkv|m4v)(\?.*)?$/i));
+    setActiveCustomUrl(url, { isVideo: finalIsVideo, isYouTube: finalIsYouTube, youTubeId: finalYouTubeId, name });
     updatePreferences({
       activeCustomImageUrl: url,
       activeCustomImageId: matched?.id,
@@ -146,14 +147,14 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
   };
 
   const handleSelectCurated = (item: BackgroundItem) => {
-    setActiveCustomUrl(undefined);
     setActiveBackground(item);
+    setActiveCustomUrl(undefined);
     updatePreferences({
       activeBackgroundId: item.id,
       activeCustomImageUrl: undefined,
       activeCustomImageId: undefined,
-      activeCustomMediaIsVideo: item.isVideo,
-      activeCustomMediaIsYouTube: item.isYouTube,
+      activeCustomMediaIsVideo: Boolean(item.isVideo),
+      activeCustomMediaIsYouTube: Boolean(item.isYouTube),
       activeCustomMediaYouTubeId: item.youTubeId,
     });
     soundEngine.playSelect();
@@ -161,14 +162,14 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
   };
 
   const handleSelectDaily = (item: BackgroundItem) => {
-    setActiveCustomUrl(undefined);
     setActiveBackground(item);
+    setActiveCustomUrl(undefined);
     updatePreferences({
       activeBackgroundId: item.id,
       activeCustomImageUrl: undefined,
       activeCustomImageId: undefined,
-      activeCustomMediaIsVideo: item.isVideo,
-      activeCustomMediaIsYouTube: item.isYouTube,
+      activeCustomMediaIsVideo: Boolean(item.isVideo),
+      activeCustomMediaIsYouTube: Boolean(item.isYouTube),
       activeCustomMediaYouTubeId: item.youTubeId,
       lastRotationTimestamp: Date.now()
     });
@@ -445,12 +446,48 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
           {/* TAB 1: CURATED ARTWORKS GALLERY */}
           {activeTab === 'curated' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between text-xs text-neutral-400 mb-2">
-                <span>Click any high-resolution artwork to apply it immediately:</span>
-                <span className="text-emerald-400 font-mono">100% Legit HD Photography &amp; Art</span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs text-neutral-400 gap-2 mb-1">
+                <span>Click any high-resolution artwork or motion loop to apply it immediately:</span>
+                <span className="text-emerald-400 font-mono text-[11px]">100% Legit HD Art • Motion &amp; YouTube Ready</span>
               </div>
+
+              {/* Filter Pills for Artworks & Motion Backgrounds */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs scrollbar-none">
+                {[
+                  { id: 'all', label: `All Artworks (${CURATED_BACKGROUNDS.length})` },
+                  { id: 'video', label: `▶ Motion Loops (${CURATED_BACKGROUNDS.filter(b => b.isVideo && !b.isYouTube).length})` },
+                  { id: 'youtube', label: `▶ YouTube 4K (${CURATED_BACKGROUNDS.filter(b => b.isYouTube).length})` },
+                  { id: 'doom', label: 'Doctor Doom' },
+                  { id: 'marvel', label: 'Avengers' },
+                  { id: 'cyberpunk', label: 'Cyberpunk' },
+                  { id: 'secretwars', label: 'Secret Wars' },
+                  { id: 'comics', label: 'Vintage Comics' },
+                  { id: 'darkart', label: 'Dark Sorcery' },
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => {
+                      setCuratedFilter(tab.id as any);
+                      soundEngine.playUiClick();
+                    }}
+                    className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all text-xs ${
+                      curatedFilter === tab.id
+                        ? 'bg-emerald-500 text-black shadow-[0_0_15px_rgba(0,255,136,0.4)]'
+                        : 'bg-white/5 hover:bg-white/10 text-neutral-300'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {CURATED_BACKGROUNDS.map(item => {
+                {CURATED_BACKGROUNDS.filter(item => {
+                  if (curatedFilter === 'all') return true;
+                  if (curatedFilter === 'video') return item.isVideo && !item.isYouTube;
+                  if (curatedFilter === 'youtube') return item.isYouTube;
+                  return item.category === curatedFilter;
+                }).map(item => {
                   const isActive = !activeCustomUrl && activeBackground?.id === item.id;
                   return (
                     <div

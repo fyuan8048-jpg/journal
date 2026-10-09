@@ -8,7 +8,7 @@ interface QuickWallpaperBarProps {
   activeBackground: BackgroundItem;
   onSelectCuratedBackground: (bg: BackgroundItem) => void;
   activeCustomUrl?: string;
-  onSelectCustomUrl: (url: string) => void;
+  onSelectCustomUrl: (url: string, mediaMeta?: { isVideo?: boolean; isYouTube?: boolean; youTubeId?: string; name?: string }) => void;
   onOpenFullModal: () => void;
 }
 
@@ -90,7 +90,7 @@ export const QuickWallpaperBar: React.FC<QuickWallpaperBarProps> = ({
                   <div
                     key={img.id}
                     onClick={() => {
-                      onSelectCustomUrl(img.url);
+                      onSelectCustomUrl(img.url, { isVideo: img.isVideo, isYouTube: img.isYouTube, youTubeId: img.youTubeId, name: img.name });
                       soundEngine.playSelect();
                     }}
                     onMouseEnter={() => soundEngine.playUiHover()}
@@ -100,7 +100,13 @@ export const QuickWallpaperBar: React.FC<QuickWallpaperBarProps> = ({
                         : 'border-white/15 hover:border-white/40'
                     }`}
                   >
-                    {img.isVideo ? (
+                    {img.isYouTube ? (
+                      <img
+                        src={img.thumbnailDataUrl || (img.youTubeId ? `https://img.youtube.com/vi/${img.youTubeId}/hqdefault.jpg` : img.url)}
+                        alt={img.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : img.isVideo ? (
                       img.thumbnailDataUrl ? (
                         <img src={img.thumbnailDataUrl} alt={img.name} className="w-full h-full object-cover" />
                       ) : (
@@ -110,11 +116,15 @@ export const QuickWallpaperBar: React.FC<QuickWallpaperBarProps> = ({
                       <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
                     )}
                     <div className="absolute inset-0 bg-black/30 group-hover:bg-transparent transition-colors" />
-                    {img.isVideo && (
-                      <span className="absolute top-1 left-1 px-1 py-0.5 rounded text-[8px] font-black uppercase bg-violet-600/90 text-white">
+                    {img.isYouTube ? (
+                      <span className="absolute top-1 left-1 px-1 py-0.5 rounded text-[8px] font-black uppercase bg-rose-600/90 text-white shadow">
+                        ▶ YouTube
+                      </span>
+                    ) : img.isVideo ? (
+                      <span className="absolute top-1 left-1 px-1 py-0.5 rounded text-[8px] font-black uppercase bg-violet-600/90 text-white shadow">
                         ▶ Video
                       </span>
-                    )}
+                    ) : null}
                     {isSelected && (
                       <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-emerald-500 text-black flex items-center justify-center font-bold">
                         <Check className="w-3 h-3 stroke-[3]" />
@@ -146,11 +156,15 @@ export const QuickWallpaperBar: React.FC<QuickWallpaperBarProps> = ({
                   >
                     <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-black/30 group-hover:bg-transparent transition-colors" />
-                    {item.isVideo && (
-                      <span className="absolute top-1 left-1 px-1 py-0.5 rounded text-[8px] font-black uppercase bg-violet-600/90 text-white">
+                    {item.isYouTube ? (
+                      <span className="absolute top-1 left-1 px-1 py-0.5 rounded text-[8px] font-black uppercase bg-rose-600/90 text-white shadow">
+                        ▶ YouTube
+                      </span>
+                    ) : item.isVideo ? (
+                      <span className="absolute top-1 left-1 px-1 py-0.5 rounded text-[8px] font-black uppercase bg-violet-600/90 text-white shadow">
                         ▶ Video
                       </span>
-                    )}
+                    ) : null}
                     {isSelected && (
                       <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-emerald-500 text-black flex items-center justify-center font-bold">
                         <Check className="w-3 h-3 stroke-[3]" />

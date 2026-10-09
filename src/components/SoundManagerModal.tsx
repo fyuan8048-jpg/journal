@@ -29,6 +29,8 @@ interface SoundManagerModalProps {
   setSoundType: (type: SoundEffectType) => void;
   isMuted: boolean;
   onToggleMute: () => void;
+  isClockMuted?: boolean;
+  onToggleClockMute?: () => void;
   currentTrack: MusicTrack;
   setCurrentTrack: (track: MusicTrack) => void;
   isMusicPlaying: boolean;
@@ -44,6 +46,8 @@ export const SoundManagerModal: React.FC<SoundManagerModalProps> = ({
   setSoundType,
   isMuted,
   onToggleMute,
+  isClockMuted = false,
+  onToggleClockMute,
   currentTrack,
   setCurrentTrack,
   isMusicPlaying,
@@ -390,29 +394,41 @@ export const SoundManagerModal: React.FC<SoundManagerModalProps> = ({
                 </div>
               </div>
 
-              {/* Music Volume Control */}
-              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2 text-xs font-bold text-white">
-                  <Volume2 className="w-4 h-4 text-emerald-400" />
-                  <span>Music Volume</span>
+              {/* Music Volume & Mute Control */}
+              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={onToggleMute}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+                      isMuted
+                        ? 'bg-rose-950 border border-rose-500 text-rose-300'
+                        : 'bg-emerald-950/60 border border-emerald-500/50 text-emerald-300'
+                    }`}
+                  >
+                    {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                    <span>{isMuted ? 'Music Muted' : 'Music Unmuted'}</span>
+                  </button>
+                  <span className="text-xs font-bold text-white">Music Volume</span>
                 </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={musicVol}
-                  onChange={e => {
-                    const val = parseFloat(e.target.value);
-                    setMusicVol(val);
-                    soundEngine.setMusicVolume(val);
-                    updatePreferences({ musicVolume: val });
-                  }}
-                  className="w-48 sm:w-64 accent-emerald-500 cursor-pointer"
-                />
-                <span className="text-xs font-mono text-neutral-400 w-10 text-right">
-                  {Math.round(musicVol * 100)}%
-                </span>
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={isMuted ? 0 : musicVol}
+                    onChange={e => {
+                      const val = parseFloat(e.target.value);
+                      setMusicVol(val);
+                      soundEngine.setMusicVolume(val);
+                      updatePreferences({ musicVolume: val });
+                    }}
+                    className="w-full sm:w-64 accent-emerald-500 cursor-pointer"
+                  />
+                  <span className="text-xs font-mono text-neutral-400 w-12 text-right">
+                    {isMuted ? 'Muted' : `${Math.round(musicVol * 100)}%`}
+                  </span>
+                </div>
               </div>
 
               {/* Add Custom Music Track */}
@@ -699,15 +715,15 @@ export const SoundManagerModal: React.FC<SoundManagerModalProps> = ({
               {/* Master Mute & Volume */}
               <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between gap-4">
                 <button
-                  onClick={onToggleMute}
+                  onClick={onToggleClockMute || onToggleMute}
                   className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
-                    isMuted
+                    isClockMuted
                       ? 'bg-rose-950 border border-rose-500 text-rose-300'
                       : 'bg-emerald-950/60 border border-emerald-500/50 text-emerald-300'
                   }`}
                 >
-                  {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                  <span>{isMuted ? 'Clock Muted' : 'Clock Unmuted'}</span>
+                  {isClockMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                  <span>{isClockMuted ? 'Clock Muted' : 'Clock Unmuted'}</span>
                 </button>
 
                 <div className="flex items-center gap-2">

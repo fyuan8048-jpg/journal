@@ -16,10 +16,25 @@ export interface ParsedMedia {
 export function extractYouTubeId(url: string): string | null {
   if (!url) return null;
   const cleanUrl = url.trim();
+  // Direct 11-character video ID
+  if (/^[\w-]{11}$/.test(cleanUrl)) {
+    return cleanUrl;
+  }
   const match = cleanUrl.match(
     /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/|live\/))([\w-]{11})/i
   );
-  return match ? match[1] : null;
+  if (match) return match[1];
+
+  // Also check URL search params for ?v=
+  try {
+    const parsedUrl = new URL(cleanUrl);
+    const vParam = parsedUrl.searchParams.get('v');
+    if (vParam && /^[\w-]{11}$/.test(vParam)) {
+      return vParam;
+    }
+  } catch {}
+
+  return null;
 }
 
 /**
@@ -155,7 +170,7 @@ export async function fetchLinkMetadata(
  */
 export function sendYouTubeCommand(
   iframe: HTMLIFrameElement | null,
-  func: 'playVideo' | 'pauseVideo' | 'stopVideo' | 'mute' | 'unMute' | 'setVolume' | 'seekTo',
+  func: 'playVideo' | 'pauseVideo' | 'stopVideo' | 'mute' | 'unMute' | 'setVolume' | 'seekTo' | 'setPlaybackRate',
   args: (number | string | boolean)[] = []
 ) {
   if (!iframe || !iframe.contentWindow) return;

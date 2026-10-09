@@ -511,9 +511,10 @@ function AppContent() {
           <iframe
             ref={bgYouTubeIframeRef}
             key={`yt-bg-${currentBgYouTubeId}`}
-            src={`https://www.youtube.com/embed/${currentBgYouTubeId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${currentBgYouTubeId}&playsinline=1&rel=0&showinfo=0&modestbranding=1&enablejsapi=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
+            src={`https://www.youtube.com/embed/${currentBgYouTubeId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${currentBgYouTubeId}&playsinline=1&rel=0&showinfo=0&modestbranding=1&enablejsapi=1`}
             title="Ambient Motion Background"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            referrerPolicy="strict-origin-when-cross-origin"
             className="absolute -top-[12%] -left-[12%] w-[124%] h-[124%] object-cover pointer-events-none border-none scale-105"
             style={{ pointerEvents: 'none' }}
             onLoad={() => {
@@ -686,9 +687,10 @@ function AppContent() {
           <iframe
             ref={musicYouTubeIframeRef}
             key={`yt-audio-${currentTrack.youTubeId}`}
-            src={`https://www.youtube.com/embed/${currentTrack.youTubeId}?autoplay=1&mute=${isMusicMuted ? 1 : 0}&controls=0&loop=1&playlist=${currentTrack.youTubeId}&playsinline=1&rel=0&enablejsapi=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
+            src={`https://www.youtube.com/embed/${currentTrack.youTubeId}?autoplay=1&mute=${isMusicMuted ? 1 : 0}&controls=0&loop=1&playlist=${currentTrack.youTubeId}&playsinline=1&rel=0&enablejsapi=1`}
             title="Background Music Player"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            referrerPolicy="strict-origin-when-cross-origin"
             className="w-full h-full border-none"
             onLoad={() => {
               if (musicYouTubeIframeRef.current) {

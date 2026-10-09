@@ -18,7 +18,7 @@ import { CURATED_BACKGROUNDS, type BackgroundItem, getDailyBackground } from '..
 import { useAuth } from '../context/AuthContext';
 import { soundEngine } from '../audio/soundEngine';
 import { fetchArtworksForCountdown, fetchArtworksFromWeb } from '../utils/artworkFetcher';
-import { compressImage, storeImageBlob } from '../utils/mediaStorage';
+import { compressImage, storeMediaBlob, generateVideoThumbnail } from '../utils/mediaStorage';
 
 interface BackgroundModalProps {
   isOpen: boolean;
@@ -121,19 +121,31 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
   const todayDaily = getDailyBackground(interests, dailyOffset);
   const tomorrowDaily = getDailyBackground(interests, dailyOffset + 1);
 
-  // Unified Wallpaper Activators
-  const handleSelectCustom = (url: string, name?: string) => {
+  // Unified Wallpaper & Video Activators
+  const handleSelectCustom = (url: string, name?: string, isVideo?: boolean) => {
     setActiveCustomUrl(url);
-    updatePreferences({ activeCustomImageUrl: url });
-    soundEngine.playUiClick();
-    showToast(`✓ Wallpaper applied: ${name || 'Custom Image'}`);
+    const matched = customImages.find(i => i.url === url || i.id === url);
+    const finalIsVideo = isVideo !== undefined ? isVideo : Boolean(matched?.isVideo || url.match(/\.(mp4|webm|mov|mkv|m4v)(\?.*)?$/i));
+    updatePreferences({
+      activeCustomImageUrl: url,
+      activeCustomImageId: matched?.id,
+      activeCustomMediaIsVideo: finalIsVideo,
+      activeBackgroundId: undefined,
+    });
+    soundEngine.playSelect();
+    showToast(`✓ Wallpaper applied: ${name || 'Custom Media'}`);
   };
 
   const handleSelectCurated = (item: BackgroundItem) => {
     setActiveCustomUrl(undefined);
     setActiveBackground(item);
-    updatePreferences({ activeBackgroundId: item.id, activeCustomImageUrl: undefined });
-    soundEngine.playUiClick();
+    updatePreferences({
+      activeBackgroundId: item.id,
+      activeCustomImageUrl: undefined,
+      activeCustomImageId: undefined,
+      activeCustomMediaIsVideo: item.isVideo,
+    });
+    soundEngine.playSelect();
     showToast(`✓ Wallpaper applied: ${item.title}`);
   };
 
@@ -143,9 +155,11 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
     updatePreferences({
       activeBackgroundId: item.id,
       activeCustomImageUrl: undefined,
+      activeCustomImageId: undefined,
+      activeCustomMediaIsVideo: item.isVideo,
       lastRotationTimestamp: Date.now()
     });
-    soundEngine.playUiClick();
+    soundEngine.playSelect();
     showToast(`✓ Daily wallpaper applied: ${item.title}`);
   };
 
@@ -166,8 +180,9 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
   const handleSaveToWallpapers = (item: BackgroundItem) => {
     addCustomImage({
       name: item.title,
-      url: item.imageUrl,
-      collectionName: 'Web Saved Art'
+      url: item.videoUrl || item.imageUrl,
+      collectionName: 'Web Saved Art',
+      isVideo: item.isVideo,
     });
     soundEngine.playSuccessCheck();
     showToast(`✓ Saved "${item.title}" to My Wallpapers!`);
@@ -180,42 +195,51 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
     }
   };
 
-  // Handle URL Add
+  // Handle URL Add (Supports Images, Web Videos & Animations)
   const handleAddUrl = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newImageUrl.trim()) return;
     try {
       new URL(newImageUrl.trim());
     } catch {
-      setUploadError('Please enter a valid image URL');
+      setUploadError('Please enter a valid media URL');
       return;
     }
 
-    const title = newImageName.trim() || 'Custom Artwork';
+    const trimmed = newImageUrl.trim();
+    const isVideo = Boolean(trimmed.match(/\.(mp4|webm|mov|mkv|m4v)(\?.*)?$/i));
+    const title = newImageName.trim() || (isVideo ? 'Custom Motion Video' : 'Custom Artwork');
+    const mediaId = `media_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
     addCustomImage({
+      id: mediaId,
       name: title,
-      url: newImageUrl.trim(),
-      collectionName: collectionName.trim() || 'General',
+      url: trimmed,
+      collectionName: collectionName.trim() || 'Custom Media',
+      isVideo,
     });
 
-    handleSelectCustom(newImageUrl.trim(), title);
+    handleSelectCustom(trimmed, title, isVideo);
     setNewImageUrl('');
     setNewImageName('');
     setUploadError('');
   };
 
-  // Handle File Upload with automatic compression and local IndexedDB persistence
+  // Handle File Upload with automatic compression, video thumbnailing and local IndexedDB persistence
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      setUploadError('Please choose a valid image file (PNG, JPG, WebP)');
+    const isVideo = file.type.startsWith('video/') || !!file.name.match(/\.(mp4|webm|mov|mkv|avi|m4v)$/i);
+    const isImage = file.type.startsWith('image/') || !!file.name.match(/\.(png|jpe?g|webp|gif|svg)$/i);
+
+    if (!isVideo && !isImage) {
+      setUploadError('Please choose a valid image file (PNG, JPG, WebP, GIF) or video file (MP4, WEBM, MOV)');
       return;
     }
 
-    if (file.size > 20 * 1024 * 1024) {
-      setUploadError('File exceeds 20MB limit. Please choose a smaller image.');
+    if (file.size > 80 * 1024 * 1024) {
+      setUploadError('File exceeds 80MB limit. Please choose a smaller video or image.');
       return;
     }
 
@@ -224,29 +248,48 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
 
     try {
       const title = file.name.replace(/\.[^/.]+$/, '');
-      const imageId = `img_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const mediaId = `media_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
-      // Compress to high-quality 1080p WebP
-      const { blob, thumbnailDataUrl } = await compressImage(file);
+      if (isVideo) {
+        // Video file processing with thumbnail generation
+        const { thumbnailDataUrl } = await generateVideoThumbnail(file);
+        const storageKey = await storeMediaBlob(mediaId, file);
+        const displayUrl = URL.createObjectURL(file);
 
-      // Store raw blob in local IndexedDB (zero impact on Firestore / localStorage limits)
-      const storageKey = await storeImageBlob(imageId, blob);
-      const displayUrl = URL.createObjectURL(blob);
+        addCustomImage({
+          id: mediaId,
+          name: title,
+          url: displayUrl,
+          collectionName: collectionName.trim() || 'Uploaded Videos',
+          storageKey,
+          thumbnailDataUrl,
+          isVideo: true,
+        });
 
-      addCustomImage({
-        id: imageId,
-        name: title,
-        url: displayUrl,
-        collectionName: collectionName.trim() || 'Uploaded Wallpapers',
-        storageKey,
-        thumbnailDataUrl,
-      });
+        handleSelectCustom(displayUrl, title, true);
+        showToast(`✓ Video wallpaper applied: ${title}`);
+      } else {
+        // Image file processing with canvas compression
+        const { blob, thumbnailDataUrl } = await compressImage(file);
+        const storageKey = await storeMediaBlob(mediaId, blob);
+        const displayUrl = URL.createObjectURL(blob);
 
-      handleSelectCustom(displayUrl, title);
-      showToast(`✓ Uploaded & applied: ${title}`);
+        addCustomImage({
+          id: mediaId,
+          name: title,
+          url: displayUrl,
+          collectionName: collectionName.trim() || 'Uploaded Wallpapers',
+          storageKey,
+          thumbnailDataUrl,
+          isVideo: false,
+        });
+
+        handleSelectCustom(displayUrl, title, false);
+        showToast(`✓ Image wallpaper applied: ${title}`);
+      }
     } catch (err) {
       console.error('Failed to process uploaded file:', err);
-      setUploadError('Failed to process image. Please try another file.');
+      setUploadError('Failed to process file. Please try another image or video.');
     } finally {
       setIsUploadingFile(false);
       e.target.value = '';
@@ -681,23 +724,23 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
             <div className="space-y-6">
               {/* Upload Dropzones */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* File Upload */}
+                {/* File Upload (Images & Videos) */}
                 <div className="p-5 rounded-2xl bg-white/5 border border-white/10 hover:border-emerald-500/40 transition-colors flex flex-col justify-center items-center text-center relative overflow-hidden">
                   <Upload className="w-8 h-8 text-emerald-400 mb-2" />
-                  <p className="text-sm font-bold text-white mb-1">Upload from Device</p>
-                  <p className="text-xs text-neutral-400 mb-4">PNG, JPG, WebP up to 20MB</p>
+                  <p className="text-sm font-bold text-white mb-1">Upload Image or Video</p>
+                  <p className="text-xs text-neutral-400 mb-4">PNG, JPG, WebP, GIF or MP4, WebM (up to 80MB)</p>
                   <label className={`cursor-pointer px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow flex items-center gap-1.5 ${isUploadingFile ? 'opacity-75 pointer-events-none' : ''}`}>
                     {isUploadingFile ? (
                       <>
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Optimizing &amp; Saving...</span>
+                        <span>Processing &amp; Storing...</span>
                       </>
                     ) : (
-                      <span>Choose Image</span>
+                      <span>Choose Image or Video</span>
                     )}
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/*,video/mp4,video/webm,video/quicktime,video/mov"
                       disabled={isUploadingFile}
                       onChange={handleFileUpload}
                       className="hidden"
@@ -705,23 +748,23 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
                   </label>
                 </div>
 
-                {/* Direct Image URL Add */}
+                {/* Direct Image or Video URL Add */}
                 <form
                   onSubmit={handleAddUrl}
                   className="p-5 rounded-2xl bg-white/5 border border-white/10 flex flex-col justify-between"
                 >
                   <div>
-                    <p className="text-sm font-bold text-white mb-2">Add via Direct URL</p>
+                    <p className="text-sm font-bold text-white mb-2">Add via Direct URL (Image or Video)</p>
                     <input
                       type="url"
-                      placeholder="Paste image URL (https://...)"
+                      placeholder="Paste image or video URL (https://... .mp4, .webm, .jpg)"
                       value={newImageUrl}
                       onChange={e => setNewImageUrl(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-white/10 text-white placeholder-neutral-500 text-xs focus:outline-none focus:border-emerald-500 mb-2"
                     />
                     <input
                       type="text"
-                      placeholder="Wallpaper title (optional)"
+                      placeholder="Title / Description (optional)"
                       value={newImageName}
                       onChange={e => setNewImageName(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-white/10 text-white placeholder-neutral-500 text-xs focus:outline-none focus:border-emerald-500"
@@ -742,15 +785,15 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
                 </div>
               )}
 
-              {/* User Custom Wallpaper Grid */}
+              {/* User Custom Wallpaper & Video Grid */}
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400 mb-3">
-                  My Wallpapers ({customImages.length})
+                  My Custom Media ({customImages.length})
                 </h4>
                 {customImages.length === 0 ? (
                   <div className="py-12 text-center text-neutral-500 border border-dashed border-white/10 rounded-2xl">
-                    <p className="text-sm">No custom wallpapers saved yet.</p>
-                    <p className="text-xs text-neutral-600 mt-1">Upload an image or explore the Web Discovery tab.</p>
+                    <p className="text-sm">No custom wallpapers or videos saved yet.</p>
+                    <p className="text-xs text-neutral-600 mt-1">Upload an image, video, or explore the Curated motion loops.</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -759,19 +802,37 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
                       return (
                         <div
                           key={img.id}
-                          onClick={() => handleSelectCustom(img.url, img.name)}
+                          onClick={() => handleSelectCustom(img.url, img.name, img.isVideo)}
+                          onMouseEnter={() => soundEngine.playUiHover()}
                           className={`group relative h-48 rounded-2xl overflow-hidden border cursor-pointer transition-all hover:scale-[1.02] ${
                             isActive
                               ? 'border-emerald-500 ring-2 ring-emerald-500 shadow-[0_0_20px_rgba(0,255,136,0.4)]'
                               : 'border-white/10 hover:border-emerald-500/50'
                           }`}
                         >
-                          <img
-                            src={img.url}
-                            alt={img.name}
-                            loading="lazy"
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          />
+                          {img.isVideo ? (
+                            img.thumbnailDataUrl ? (
+                              <img
+                                src={img.thumbnailDataUrl}
+                                alt={img.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                              />
+                            ) : (
+                              <video
+                                src={img.url}
+                                muted
+                                playsInline
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                              />
+                            )
+                          ) : (
+                            <img
+                              src={img.url}
+                              alt={img.name}
+                              loading="lazy"
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            />
+                          )}
                           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
 
                           <button
@@ -779,19 +840,26 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
                             onClick={e => {
                               e.stopPropagation();
                               removeCustomImage(img.id);
-                              showToast('Removed wallpaper');
+                              showToast('Removed custom media');
                             }}
                             className="absolute top-2 right-2 p-2 rounded-lg bg-black/70 hover:bg-rose-600 text-neutral-300 hover:text-white transition-colors z-10"
-                            title="Delete Wallpaper"
+                            title="Delete Item"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
 
-                          {isActive && (
-                            <div className="absolute top-2 left-2 px-2.5 py-1 rounded-lg bg-emerald-500 text-black text-[10px] font-black uppercase flex items-center gap-1.5 shadow-[0_0_10px_rgba(0,255,136,0.6)] z-10">
-                              <Check className="w-3.5 h-3.5 stroke-[3]" /> Active Wallpaper
-                            </div>
-                          )}
+                          <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
+                            {img.isVideo && (
+                              <div className="px-2 py-0.5 rounded-md bg-violet-600/90 text-white text-[10px] font-black uppercase flex items-center gap-1 shadow-md">
+                                ▶ Video
+                              </div>
+                            )}
+                            {isActive && (
+                              <div className="px-2.5 py-1 rounded-lg bg-emerald-500 text-black text-[10px] font-black uppercase flex items-center gap-1.5 shadow-[0_0_10px_rgba(0,255,136,0.6)]">
+                                <Check className="w-3.5 h-3.5 stroke-[3]" /> Active
+                              </div>
+                            )}
+                          </div>
 
                           <div className="absolute bottom-3 left-3 right-3 pointer-events-none">
                             <p className="text-sm font-bold text-white truncate drop-shadow">{img.name}</p>

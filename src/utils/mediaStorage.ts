@@ -86,21 +86,86 @@ export async function compressImage(
 }
 
 /**
- * Stores a full-resolution image blob in IndexedDB under `img_blob_${id}`
+ * Extracts a video thumbnail and duration from an uploaded video file.
  */
-export async function storeImageBlob(id: string, blob: Blob): Promise<string> {
-  const key = `img_blob_${id}`;
+export async function generateVideoThumbnail(
+  file: File
+): Promise<{ thumbnailDataUrl: string; duration: number }> {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    const objectUrl = URL.createObjectURL(file);
+    video.preload = 'metadata';
+    video.muted = true;
+    video.playsInline = true;
+    video.src = objectUrl;
+
+    const cleanup = () => {
+      try {
+        URL.revokeObjectURL(objectUrl);
+      } catch {}
+    };
+
+    video.onloadeddata = () => {
+      video.currentTime = Math.min(0.5, (video.duration || 1) / 2);
+    };
+
+    video.onseeked = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 320;
+        canvas.height = 180;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, 320, 180);
+          const thumbnailDataUrl = canvas.toDataURL('image/jpeg', 0.6);
+          cleanup();
+          resolve({ thumbnailDataUrl, duration: video.duration || 0 });
+          return;
+        }
+      } catch {}
+      cleanup();
+      resolve({ thumbnailDataUrl: '', duration: video.duration || 0 });
+    };
+
+    video.onerror = () => {
+      cleanup();
+      resolve({ thumbnailDataUrl: '', duration: 0 });
+    };
+
+    // Safety timeout in case video fails to decode
+    setTimeout(() => {
+      cleanup();
+      resolve({ thumbnailDataUrl: '', duration: 0 });
+    }, 4000);
+  });
+}
+
+/**
+ * Stores a full-resolution media blob (image or video) in IndexedDB under `media_blob_${id}`
+ */
+export async function storeMediaBlob(id: string, blob: Blob): Promise<string> {
+  const key = `media_blob_${id}`;
   await idbSet(key, blob);
   return key;
 }
 
 /**
+ * Backward compatibility wrapper for storeImageBlob
+ */
+export async function storeImageBlob(id: string, blob: Blob): Promise<string> {
+  return storeMediaBlob(id, blob);
+}
+
+/**
  * Retrieves a stored blob from IndexedDB and returns a live object URL
  */
-export async function getImageBlobUrl(key: string): Promise<string | null> {
+export async function getMediaBlobUrl(key: string): Promise<string | null> {
   try {
-    const blob = await get<Blob>(key);
-    if (blob) {
+    let blob = await get<Blob>(key);
+    if (!blob && !key.startsWith('media_blob_') && !key.startsWith('img_blob_')) {
+      blob = await get<Blob>(`media_blob_${key}`) || await get<Blob>(`img_blob_${key}`);
+    }
+    if (blob instanceof Blob) {
       return URL.createObjectURL(blob);
     }
   } catch (e) {
@@ -110,38 +175,58 @@ export async function getImageBlobUrl(key: string): Promise<string | null> {
 }
 
 /**
- * Removes a blob from IndexedDB
+ * Backward compatibility wrapper for getImageBlobUrl
  */
-export async function deleteImageBlob(id: string): Promise<void> {
-  try {
-    await idbDel(`img_blob_${id}`);
-  } catch (e) {
-    console.warn('Failed to delete blob from IndexedDB for id:', id, e);
-  }
+export async function getImageBlobUrl(key: string): Promise<string | null> {
+  return getMediaBlobUrl(key);
 }
 
 /**
- * Restores live blob URLs for all user custom images from IndexedDB upon sign-in/mount
+ * Removes a media blob from IndexedDB
+ */
+export async function deleteMediaBlob(id: string): Promise<void> {
+  try {
+    await idbDel(`media_blob_${id}`);
+    await idbDel(`img_blob_${id}`);
+  } catch (e) {
+    console.warn('Failed to delete media blob from IndexedDB for id:', id, e);
+  }
+}
+
+export async function deleteImageBlob(id: string): Promise<void> {
+  return deleteMediaBlob(id);
+}
+
+/**
+ * Restores live blob URLs for all user custom images and videos from IndexedDB upon sign-in/mount
  */
 export async function restoreImagesFromStorage(images: UserCustomImage[]): Promise<UserCustomImage[]> {
   if (!images || images.length === 0) return [];
 
   const restored = await Promise.all(
     images.map(async (img) => {
-      // If it's a web URL (https://...), it's already live
-      if (img.url.startsWith('http://') || img.url.startsWith('https://')) {
+      // If it's a web URL (http:// or https://), it's already live
+      if (img.url && (img.url.startsWith('http://') || img.url.startsWith('https://'))) {
         return img;
       }
 
-      // Check IndexedDB for the local blob
-      const storageKey = img.storageKey || `img_blob_${img.id}`;
-      const blobUrl = await getImageBlobUrl(storageKey);
-      if (blobUrl) {
-        return {
-          ...img,
-          url: blobUrl,
-          storageKey,
-        };
+      // Check IndexedDB for the local blob using storageKey or id
+      const possibleKeys = [
+        img.storageKey,
+        `media_blob_${img.id}`,
+        `img_blob_${img.id}`,
+        img.id
+      ].filter(Boolean) as string[];
+
+      for (const k of possibleKeys) {
+        const blobUrl = await getMediaBlobUrl(k);
+        if (blobUrl) {
+          return {
+            ...img,
+            url: blobUrl,
+            storageKey: k,
+          };
+        }
       }
 
       // Fallback to thumbnail or existing URL
@@ -161,25 +246,26 @@ export function sanitizeProfileForFirestore(profile: UserProfile): UserProfile {
 
   if (sanitized.preferences?.customImages) {
     sanitized.preferences.customImages = sanitized.preferences.customImages.map((img) => {
-      // If the image URL is a huge base64 data string (> 30KB), strip it for Firestore
-      if (img.url && img.url.startsWith('data:') && img.url.length > 30000) {
+      // If the image/video URL is a huge base64 data string (> 30KB) or temporary blob: URL, clean it for Firestore
+      if (img.url && (img.url.startsWith('data:') && img.url.length > 30000 || img.url.startsWith('blob:'))) {
         return {
           ...img,
           url: img.thumbnailDataUrl || '', // Store micro-thumbnail or empty, blob stays in local IndexedDB
-          storageKey: img.storageKey || `img_blob_${img.id}`,
+          storageKey: img.storageKey || `media_blob_${img.id}`,
         };
       }
       return img;
     });
   }
 
-  // If the active custom wallpaper is a huge base64 string, sanitize it too
+  // If the active custom wallpaper is a huge base64 string or blob URL, sanitize it too
   if (
     sanitized.preferences?.activeCustomImageUrl &&
-    sanitized.preferences.activeCustomImageUrl.startsWith('data:') &&
-    sanitized.preferences.activeCustomImageUrl.length > 30000
+    (sanitized.preferences.activeCustomImageUrl.startsWith('data:') && sanitized.preferences.activeCustomImageUrl.length > 30000 ||
+     sanitized.preferences.activeCustomImageUrl.startsWith('blob:'))
   ) {
-    sanitized.preferences.activeCustomImageUrl = '';
+    // Keep reference ID instead of dead blob URL
+    sanitized.preferences.activeCustomImageUrl = sanitized.preferences.activeCustomImageId || '';
   }
 
   return sanitized;

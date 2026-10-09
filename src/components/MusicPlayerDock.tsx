@@ -1,6 +1,7 @@
 import React from 'react';
 import { Play, Pause, SkipForward, Disc, Sliders } from 'lucide-react';
 import { type MusicTrack, soundEngine, BUILTIN_MUSIC_TRACKS } from '../audio/soundEngine';
+import { useAuth } from '../context/AuthContext';
 
 interface MusicPlayerDockProps {
   currentTrack: MusicTrack;
@@ -17,9 +18,12 @@ export const MusicPlayerDock: React.FC<MusicPlayerDockProps> = ({
   setIsMusicPlaying,
   onOpenSoundStudio,
 }) => {
+  const { updatePreferences } = useAuth();
+
   const handleTogglePlay = () => {
     const next = soundEngine.toggleMusic();
     setIsMusicPlaying(next);
+    updatePreferences({ isMusicPlaying: next, currentMusicTrackId: currentTrack.id });
   };
 
   const handleNextTrack = () => {
@@ -30,6 +34,8 @@ export const MusicPlayerDock: React.FC<MusicPlayerDockProps> = ({
     setCurrentTrack(nextTrack);
     soundEngine.playTrack(nextTrack);
     setIsMusicPlaying(true);
+    updatePreferences({ currentMusicTrackId: nextTrack.id, isMusicPlaying: true });
+    soundEngine.playSelect();
   };
 
   return (

@@ -56,6 +56,7 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
   const handleSoundChange = (type: SoundEffectType) => {
     setSoundType(type);
     soundEngine.setSoundType(type);
+    updatePreferences({ soundType: type });
     if (type !== 'none') {
       soundEngine.playTick();
     }
@@ -64,37 +65,47 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
   const handleClockVolumeChange = (newVol: number) => {
     setClockVolume(newVol);
     soundEngine.setClockVolume(newVol);
+    updatePreferences({ volume: newVol });
   };
 
   const handleClockMuteToggle = () => {
     const next = !isClockMuted;
     setIsClockMuted(next);
     soundEngine.setClockMuted(next);
+    updatePreferences({ isMuted: next });
   };
 
   const handleMusicVolumeChange = (newVol: number) => {
     setMusicVolume(newVol);
     soundEngine.setMusicVolume(newVol);
+    updatePreferences({ musicVolume: newVol });
   };
 
   const handleMusicMuteToggle = () => {
     const next = !isMusicMuted;
     setIsMusicMuted(next);
     soundEngine.setMusicMuted(next);
+    updatePreferences({ isMusicMuted: next });
   };
 
   const handleDroneToggle = () => {
     const next = !ambientDrone;
     setAmbientDrone(next);
     soundEngine.toggleDrone(next);
+    updatePreferences({ ambientDrone: next });
   };
 
   const handlePresetChange = (preset: ClockStylePreset) => {
     setClockPreset(preset);
+    updatePreferences({ clockPreset: preset });
+    soundEngine.playSelect();
   };
 
   const handleYearsToggle = () => {
-    setIncludeYears(!includeYears);
+    const next = !includeYears;
+    setIncludeYears(next);
+    updatePreferences({ includeYears: next });
+    soundEngine.playSelect();
   };
 
   return (

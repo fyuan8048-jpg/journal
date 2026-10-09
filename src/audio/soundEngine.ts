@@ -212,57 +212,56 @@ class SoundEngine {
     masterGain.gain.setValueAtTime(this.clockVolume * 0.9, now);
     masterGain.connect(this.ctx.destination);
 
-    // Sharp metallic impact
+    // Cinematic refined chronometer escapement (subtle, non-harsh)
     const clickOsc = this.ctx.createOscillator();
     const clickGain = this.ctx.createGain();
     const clickFilter = this.ctx.createBiquadFilter();
 
-    clickOsc.type = 'triangle';
-    clickOsc.frequency.setValueAtTime(1800, now);
-    clickOsc.frequency.exponentialRampToValueAtTime(320, now + 0.04);
+    clickOsc.type = 'sine';
+    clickOsc.frequency.setValueAtTime(1200, now);
+    clickOsc.frequency.exponentialRampToValueAtTime(600, now + 0.03);
 
-    clickFilter.type = 'bandpass';
-    clickFilter.frequency.setValueAtTime(1200, now);
-    clickFilter.Q.setValueAtTime(5, now);
+    clickFilter.type = 'lowpass';
+    clickFilter.frequency.setValueAtTime(1500, now);
 
-    clickGain.gain.setValueAtTime(0.7, now);
-    clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+    clickGain.gain.setValueAtTime(0.28, now);
+    clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
 
     clickOsc.connect(clickFilter);
     clickFilter.connect(clickGain);
     clickGain.connect(masterGain);
     clickOsc.start(now);
-    clickOsc.stop(now + 0.05);
+    clickOsc.stop(now + 0.035);
 
     // Heavy iron escapement body
     const bodyOsc = this.ctx.createOscillator();
     const bodyGain = this.ctx.createGain();
     bodyOsc.type = 'sine';
-    bodyOsc.frequency.setValueAtTime(140, now);
-    bodyOsc.frequency.exponentialRampToValueAtTime(45, now + 0.09);
+    bodyOsc.frequency.setValueAtTime(110, now);
+    bodyOsc.frequency.exponentialRampToValueAtTime(45, now + 0.08);
 
-    bodyGain.gain.setValueAtTime(0.85, now);
-    bodyGain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+    bodyGain.gain.setValueAtTime(0.45, now);
+    bodyGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
 
     bodyOsc.connect(bodyGain);
     bodyGain.connect(masterGain);
     bodyOsc.start(now);
-    bodyOsc.stop(now + 0.1);
+    bodyOsc.stop(now + 0.09);
 
     // Sub-bass tension
     const subOsc = this.ctx.createOscillator();
     const subGain = this.ctx.createGain();
     subOsc.type = 'sine';
-    subOsc.frequency.setValueAtTime(62, now);
-    subOsc.frequency.exponentialRampToValueAtTime(30, now + 0.15);
+    subOsc.frequency.setValueAtTime(58, now);
+    subOsc.frequency.exponentialRampToValueAtTime(28, now + 0.12);
 
-    subGain.gain.setValueAtTime(0.4, now);
-    subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+    subGain.gain.setValueAtTime(0.35, now);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
 
     subOsc.connect(subGain);
     subGain.connect(masterGain);
     subOsc.start(now);
-    subOsc.stop(now + 0.16);
+    subOsc.stop(now + 0.13);
   }
 
   private playHeartbeatTick() {
@@ -709,6 +708,7 @@ class SoundEngine {
     }
   }
 
+  // Smooth modern UI micro-interactions (No harsh wooden "tuk tuk" clicks)
   public playUiClick() {
     if (this.isClockMuted || this.clockVolume <= 0.001) return;
     this.init();
@@ -717,20 +717,60 @@ class SoundEngine {
       const now = this.ctx.currentTime;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
+      const filter = this.ctx.createBiquadFilter();
+
+      // Silky glass tap (no low wooden drop)
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(1400, now);
-      osc.frequency.exponentialRampToValueAtTime(800, now + 0.05);
+      osc.frequency.setValueAtTime(1920, now);
+      osc.frequency.exponentialRampToValueAtTime(2400, now + 0.025);
 
-      gain.gain.setValueAtTime(this.clockVolume * 0.15, now);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+      filter.type = 'highpass';
+      filter.frequency.setValueAtTime(1200, now);
 
-      osc.connect(gain);
+      gain.gain.setValueAtTime(this.clockVolume * 0.07, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.028);
+
+      osc.connect(filter);
+      filter.connect(gain);
       gain.connect(this.ctx.destination);
       osc.start(now);
-      osc.stop(now + 0.055);
+      osc.stop(now + 0.03);
     } catch {}
   }
 
+  // Melodic, ethereal selection sound for choosing themes, wallpapers & countdowns
+  public playSelect() {
+    if (this.isClockMuted || this.clockVolume <= 0.001) return;
+    this.init();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const osc1 = this.ctx.createOscillator();
+      const osc2 = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(880, now);
+      osc1.frequency.exponentialRampToValueAtTime(1108.73, now + 0.05);
+
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(1320, now);
+      osc2.frequency.exponentialRampToValueAtTime(1661.22, now + 0.05);
+
+      gain.gain.setValueAtTime(this.clockVolume * 0.06, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.065);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc1.start(now);
+      osc2.start(now);
+      osc1.stop(now + 0.07);
+      osc2.stop(now + 0.07);
+    } catch {}
+  }
+
+  // Soft crystalline micro-shimmer on element hover
   public playUiHover() {
     if (this.isClockMuted || this.clockVolume <= 0.001) return;
     this.init();
@@ -739,16 +779,46 @@ class SoundEngine {
       const now = this.ctx.currentTime;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(1200, now);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(2200, now);
+      osc.frequency.exponentialRampToValueAtTime(2600, now + 0.015);
 
-      gain.gain.setValueAtTime(this.clockVolume * 0.04, now);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.025);
+      gain.gain.setValueAtTime(this.clockVolume * 0.015, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.018);
 
       osc.connect(gain);
       gain.connect(this.ctx.destination);
       osc.start(now);
-      osc.stop(now + 0.03);
+      osc.stop(now + 0.02);
+    } catch {}
+  }
+
+  // Subtle atmospheric whoosh for modal and panel transitions
+  public playTransitionWhoosh() {
+    if (this.isClockMuted || this.clockVolume <= 0.001) return;
+    this.init();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const filter = this.ctx.createBiquadFilter();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(320, now);
+      osc.frequency.exponentialRampToValueAtTime(640, now + 0.05);
+
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(700, now);
+
+      gain.gain.setValueAtTime(this.clockVolume * 0.03, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.055);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.06);
     } catch {}
   }
 
@@ -764,13 +834,13 @@ class SoundEngine {
       osc.frequency.setValueAtTime(523.25, now);
       osc.frequency.setValueAtTime(783.99, now + 0.08);
 
-      gain.gain.setValueAtTime(this.clockVolume * 0.3, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      gain.gain.setValueAtTime(this.clockVolume * 0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
 
       osc.connect(gain);
       gain.connect(this.ctx.destination);
       osc.start(now);
-      osc.stop(now + 0.26);
+      osc.stop(now + 0.23);
     } catch {}
   }
 }

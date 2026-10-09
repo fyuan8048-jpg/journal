@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CountdownDisplay } from './components/CountdownDisplay';
 import { HeaderDock } from './components/HeaderDock';
@@ -12,6 +12,7 @@ import { QuickWallpaperBar } from './components/QuickWallpaperBar';
 import { MusicPlayerDock } from './components/MusicPlayerDock';
 import { SoundManagerModal } from './components/SoundManagerModal';
 import { ClockCustomizerModal } from './components/ClockCustomizerModal';
+import { BackgroundVideoControls } from './components/BackgroundVideoControls';
 import { NotesDrawer } from './components/NotesDrawer';
 import { CURATED_BACKGROUNDS, getDailyBackground, type BackgroundItem } from './data/curatedBackgrounds';
 import { getAdaptedTheme, type ClockStylePreset } from './utils/themeAdapter';
@@ -55,12 +56,25 @@ function AppContent() {
   const [soundType, setSoundType] = useState<SoundEffectType>(preferences?.soundType ?? 'doomsday');
 
   // Channel 2: Background Music Sound
-  const [musicVolume, setMusicVolume] = useState<number>(0.5);
-  const [isMusicMuted, setIsMusicMuted] = useState<boolean>(false);
+  const [musicVolume, setMusicVolume] = useState<number>(preferences?.musicVolume ?? 0.5);
+  const [isMusicMuted, setIsMusicMuted] = useState<boolean>(preferences?.isMusicMuted ?? false);
   const [ambientDrone, setAmbientDrone] = useState<boolean>(preferences?.ambientDrone ?? false);
-  const [currentTrack, setCurrentTrack] = useState<MusicTrack>(BUILTIN_MUSIC_TRACKS[0]);
-  const [isMusicPlaying, setIsMusicPlaying] = useState<boolean>(false);
+  const [currentTrack, setCurrentTrack] = useState<MusicTrack>(() => {
+    if (preferences?.currentMusicTrackId) {
+      const found = BUILTIN_MUSIC_TRACKS.find(t => t.id === preferences.currentMusicTrackId);
+      if (found) return found;
+    }
+    return BUILTIN_MUSIC_TRACKS[0];
+  });
+  const [isMusicPlaying, setIsMusicPlaying] = useState<boolean>(preferences?.isMusicPlaying ?? false);
   const [hasInteractedAudio, setHasInteractedAudio] = useState(false);
+
+  // Background Video Controls & State
+  const [bgVideoVolume, setBgVideoVolume] = useState<number>(preferences?.bgVideoVolume ?? 0.7);
+  const [isBgVideoMuted, setIsBgVideoMuted] = useState<boolean>(preferences?.bgVideoMuted ?? true);
+  const [isBgVideoPlaying, setIsBgVideoPlaying] = useState<boolean>(preferences?.bgVideoPlaying ?? true);
+  const [bgVideoSpeed, setBgVideoSpeed] = useState<number>(preferences?.bgVideoSpeed ?? 1.0);
+  const bgVideoRef = useRef<HTMLVideoElement>(null);
 
   // Clock Style & Display Settings
   const [clockPreset, setClockPreset] = useState<ClockStylePreset>(preferences?.clockPreset ?? 'doomsday');
@@ -90,7 +104,7 @@ function AppContent() {
     }
   }, [preferences?.clockCustomSettings]);
 
-  // Synchronize audio preferences when user profile loads from cloud
+  // Synchronize audio and video preferences when user profile loads from cloud
   useEffect(() => {
     if (preferences?.volume !== undefined) {
       setClockVolume(preferences.volume);
@@ -108,7 +122,49 @@ function AppContent() {
       setAmbientDrone(preferences.ambientDrone);
       soundEngine.toggleDrone(preferences.ambientDrone);
     }
-  }, [preferences?.volume, preferences?.isMuted, preferences?.soundType, preferences?.ambientDrone]);
+    if (preferences?.musicVolume !== undefined) {
+      setMusicVolume(preferences.musicVolume);
+      soundEngine.setMusicVolume(preferences.musicVolume);
+    }
+    if (preferences?.isMusicMuted !== undefined) {
+      setIsMusicMuted(preferences.isMusicMuted);
+      soundEngine.setMusicMuted(preferences.isMusicMuted);
+    }
+    if (preferences?.currentMusicTrackId) {
+      const found = BUILTIN_MUSIC_TRACKS.find(t => t.id === preferences.currentMusicTrackId);
+      if (found) setCurrentTrack(found);
+    }
+    if (preferences?.bgVideoVolume !== undefined) setBgVideoVolume(preferences.bgVideoVolume);
+    if (preferences?.bgVideoMuted !== undefined) setIsBgVideoMuted(preferences.bgVideoMuted);
+    if (preferences?.bgVideoPlaying !== undefined) setIsBgVideoPlaying(preferences.bgVideoPlaying);
+    if (preferences?.bgVideoSpeed !== undefined) setBgVideoSpeed(preferences.bgVideoSpeed);
+  }, [
+    preferences?.volume,
+    preferences?.isMuted,
+    preferences?.soundType,
+    preferences?.ambientDrone,
+    preferences?.musicVolume,
+    preferences?.isMusicMuted,
+    preferences?.currentMusicTrackId,
+    preferences?.bgVideoVolume,
+    preferences?.bgVideoMuted,
+    preferences?.bgVideoPlaying,
+    preferences?.bgVideoSpeed,
+  ]);
+
+  // Synchronize video element properties directly
+  useEffect(() => {
+    if (bgVideoRef.current) {
+      bgVideoRef.current.volume = isBgVideoMuted ? 0 : bgVideoVolume;
+      bgVideoRef.current.muted = isBgVideoMuted;
+      bgVideoRef.current.playbackRate = bgVideoSpeed;
+      if (isBgVideoPlaying) {
+        bgVideoRef.current.play().catch(() => {});
+      } else {
+        bgVideoRef.current.pause();
+      }
+    }
+  }, [bgVideoVolume, isBgVideoMuted, isBgVideoPlaying, bgVideoSpeed]);
 
   const handleUpdateCustomSettings = (newSettings: ClockCustomSettings) => {
     setCustomSettings(newSettings);
@@ -129,6 +185,7 @@ function AppContent() {
   const handleOpenBackgrounds = (tab: 'daily' | 'curated' | 'custom' | 'web' = 'curated') => {
     setBackgroundModalTab(tab);
     setIsBackgroundModalOpen(true);
+    soundEngine.playTransitionWhoosh();
   };
   const [isClockCustomizerOpen, setIsClockCustomizerOpen] = useState(false);
   const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);
@@ -150,14 +207,13 @@ function AppContent() {
     }
   }, []);
 
-  // 24-Hour Auto-Rotation Background Engine
+  // 24-Hour Auto-Rotation Background Engine (Only runs if user explicitly opted in to daily auto-rotation)
   useEffect(() => {
-    if (preferences?.autoRotate24h !== false && !activeCustomUrl) {
+    if (preferences?.autoRotate24h === true && !activeCustomUrl && preferences?.activeBackgroundId?.startsWith('daily-')) {
       const lastRot = preferences?.lastRotationTimestamp || 0;
       const now = Date.now();
       const oneDayMs = 24 * 60 * 60 * 1000;
       
-      // If 24 hours elapsed or daily rotation needs refresh
       if (now - lastRot > oneDayMs) {
         const daily = getDailyBackground(preferences?.interests || ['doom', 'marvel'], 0);
         setActiveBackground(daily);
@@ -167,7 +223,7 @@ function AppContent() {
         });
       }
     }
-  }, [preferences?.autoRotate24h, activeCustomUrl]);
+  }, [preferences?.autoRotate24h, activeCustomUrl, preferences?.activeBackgroundId]);
 
   // Synchronize active wallpaper whenever preferences update from cloud / storage
   useEffect(() => {
@@ -223,14 +279,68 @@ function AppContent() {
     setIsClockMuted(next);
     soundEngine.setClockMuted(next);
     updatePreferences({ isMuted: next });
+    soundEngine.playSelect();
+  };
+
+  // Background Video Control Handlers
+  const handleToggleBgVideoPlay = () => {
+    const next = !isBgVideoPlaying;
+    setIsBgVideoPlaying(next);
+    updatePreferences({ bgVideoPlaying: next });
+    if (bgVideoRef.current) {
+      if (next) bgVideoRef.current.play().catch(() => {});
+      else bgVideoRef.current.pause();
+    }
+  };
+
+  const handleToggleBgVideoMute = () => {
+    const next = !isBgVideoMuted;
+    setIsBgVideoMuted(next);
+    updatePreferences({ bgVideoMuted: next });
+    if (bgVideoRef.current) {
+      bgVideoRef.current.muted = next;
+      bgVideoRef.current.volume = next ? 0 : bgVideoVolume;
+    }
+  };
+
+  const handleBgVideoVolumeChange = (vol: number) => {
+    setBgVideoVolume(vol);
+    updatePreferences({ bgVideoVolume: vol });
+    if (bgVideoRef.current) {
+      bgVideoRef.current.volume = vol;
+      if (vol > 0 && isBgVideoMuted) {
+        setIsBgVideoMuted(false);
+        bgVideoRef.current.muted = false;
+        updatePreferences({ bgVideoMuted: false });
+      }
+    }
+  };
+
+  const handleBgVideoSpeedChange = (spd: number) => {
+    setBgVideoSpeed(spd);
+    updatePreferences({ bgVideoSpeed: spd });
+    if (bgVideoRef.current) {
+      bgVideoRef.current.playbackRate = spd;
+    }
   };
 
   // Compute Adaptive Theme with full customizer settings
   const backgroundPalette = activeCustomUrl ? undefined : activeBackground.palette;
   const adaptedTheme = getAdaptedTheme(clockPreset, backgroundPalette, customSettings);
 
-  // Active Background Image Source
-  const currentBgImage = activeCustomUrl || activeBackground.imageUrl;
+  // Background Media Detection (Video vs Image)
+  const isCurrentBgVideo = Boolean(
+    (activeCustomUrl && (
+      activeCustomUrl.match(/\.(mp4|webm|mov|mkv|m4v)(\?.*)?$/i) ||
+      preferences?.activeCustomMediaIsVideo ||
+      currentUser?.preferences?.customImages?.find(
+        i => i.url === activeCustomUrl || i.id === preferences?.activeCustomImageId
+      )?.isVideo
+    )) ||
+    (!activeCustomUrl && (activeBackground?.isVideo || activeBackground?.videoUrl))
+  );
+
+  const currentBgMedia = activeCustomUrl || (activeBackground.isVideo && activeBackground.videoUrl ? activeBackground.videoUrl : activeBackground.imageUrl);
 
   // Pure Clean View Condition: in full screen OR cinema mode, ONLY the countdown is visible!
   const isPureCountdownOnly = isCinemaMode || isFullscreen;
@@ -248,20 +358,43 @@ function AppContent() {
       }}
       className="relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden bg-black text-white"
     >
-      {/* 1. Base Comic / Marvel Artwork Background (Full clarity, pure artwork, no 3D effects, no green haze) */}
-      <img
-        key={currentBgImage}
-        src={currentBgImage}
-        alt="Background Artwork"
-        className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none transition-opacity duration-700"
-        onError={(e) => {
-          (e.target as HTMLImageElement).src = CURATED_BACKGROUNDS[0].imageUrl;
-        }}
-      />
+      {/* 1. Base Comic / Marvel Artwork or Motion Video Background */}
+      {isCurrentBgVideo ? (
+        <video
+          ref={bgVideoRef}
+          key={currentBgMedia}
+          src={currentBgMedia}
+          autoPlay
+          loop
+          muted={isBgVideoMuted}
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none transition-opacity duration-700"
+          onLoadedMetadata={(e) => {
+            const vid = e.currentTarget;
+            vid.volume = isBgVideoMuted ? 0 : bgVideoVolume;
+            vid.playbackRate = bgVideoSpeed;
+            if (isBgVideoPlaying) {
+              vid.play().catch(() => {});
+            } else {
+              vid.pause();
+            }
+          }}
+        />
+      ) : (
+        <img
+          key={currentBgMedia}
+          src={currentBgMedia}
+          alt="Background Artwork"
+          className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none transition-opacity duration-700"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = CURATED_BACKGROUNDS[0].imageUrl;
+          }}
+        />
+      )}
 
       {/* 2. Clean subtle overlay to ensure countdown numerals remain crisp and readable */}
-      <div className="absolute inset-0 bg-black/30 pointer-events-none" />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/50 pointer-events-none" />
+      <div className="absolute inset-0 bg-black/35 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/50 pointer-events-none" />
 
       {/* Floating Notification Toast */}
       {toastMessage && (
@@ -277,14 +410,32 @@ function AppContent() {
           activeCountdown={activeCountdown}
           isMuted={isClockMuted}
           onToggleMute={handleToggleClockMute}
-          onOpenCountdowns={() => setIsCountdownModalOpen(true)}
+          onOpenCountdowns={() => {
+            setIsCountdownModalOpen(true);
+            soundEngine.playTransitionWhoosh();
+          }}
           onOpenBackgrounds={() => handleOpenBackgrounds('curated')}
           onOpenCollections={() => handleOpenBackgrounds('curated')}
-          onOpenSoundStudio={() => setIsSoundStudioOpen(true)}
-          onOpenClockCustomizer={() => setIsClockCustomizerOpen(true)}
-          onOpenNotes={() => setIsNotesDrawerOpen(true)}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-          onOpenAuth={() => setIsAuthOpen(true)}
+          onOpenSoundStudio={() => {
+            setIsSoundStudioOpen(true);
+            soundEngine.playTransitionWhoosh();
+          }}
+          onOpenClockCustomizer={() => {
+            setIsClockCustomizerOpen(true);
+            soundEngine.playTransitionWhoosh();
+          }}
+          onOpenNotes={() => {
+            setIsNotesDrawerOpen(true);
+            soundEngine.playTransitionWhoosh();
+          }}
+          onOpenSettings={() => {
+            setIsSettingsOpen(true);
+            soundEngine.playTransitionWhoosh();
+          }}
+          onOpenAuth={() => {
+            setIsAuthOpen(true);
+            soundEngine.playTransitionWhoosh();
+          }}
           onEnterCinemaMode={() => setIsCinemaMode(true)}
           isFullscreen={isFullscreen}
           onToggleFullscreen={toggleFullscreen}
@@ -303,27 +454,58 @@ function AppContent() {
         />
       </main>
 
-      {/* 5. Quick Wallpaper Carousel (Hidden in Fullscreen / Cinema Mode) */}
+      {/* 5. Background Video Controls Widget (Only visible when video background is active) */}
+      {isCurrentBgVideo && !isPureCountdownOnly && (
+        <BackgroundVideoControls
+          title={
+            activeCustomUrl
+              ? (currentUser?.preferences?.customImages?.find(i => i.url === activeCustomUrl)?.name || 'Custom Motion Background')
+              : activeBackground.title
+          }
+          isPlaying={isBgVideoPlaying}
+          onTogglePlay={handleToggleBgVideoPlay}
+          isMuted={isBgVideoMuted}
+          onToggleMute={handleToggleBgVideoMute}
+          volume={bgVideoVolume}
+          onVolumeChange={handleBgVideoVolumeChange}
+          speed={bgVideoSpeed}
+          onSpeedChange={handleBgVideoSpeedChange}
+        />
+      )}
+
+      {/* 6. Quick Wallpaper Carousel (Hidden in Fullscreen / Cinema Mode) */}
       {!isPureCountdownOnly && (
         <QuickWallpaperBar
           activeBackground={activeBackground}
           onSelectCuratedBackground={(bg) => {
             setActiveBackground(bg);
             setActiveCustomUrl(undefined);
-            updatePreferences({ activeBackgroundId: bg.id, activeCustomImageUrl: undefined });
+            updatePreferences({
+              activeBackgroundId: bg.id,
+              activeCustomImageUrl: undefined,
+              activeCustomImageId: undefined,
+              activeCustomMediaIsVideo: bg.isVideo,
+            });
+            soundEngine.playSelect();
             showToast(`✓ Wallpaper applied: ${bg.title}`);
           }}
           activeCustomUrl={activeCustomUrl}
           onSelectCustomUrl={(url) => {
             setActiveCustomUrl(url);
-            updatePreferences({ activeCustomImageUrl: url });
+            const matched = currentUser?.preferences?.customImages?.find(i => i.url === url);
+            updatePreferences({
+              activeCustomImageUrl: url,
+              activeCustomImageId: matched?.id,
+              activeCustomMediaIsVideo: matched?.isVideo,
+            });
+            soundEngine.playSelect();
             showToast('✓ Custom wallpaper applied');
           }}
           onOpenFullModal={() => handleOpenBackgrounds('curated')}
         />
       )}
 
-      {/* 6. Floating Music Player Mini-Dock (Hidden in Fullscreen / Cinema Mode) */}
+      {/* 7. Floating Music Player Mini-Dock (Hidden in Fullscreen / Cinema Mode) */}
       {!isPureCountdownOnly && (
         <MusicPlayerDock
           currentTrack={currentTrack}
@@ -334,7 +516,7 @@ function AppContent() {
         />
       )}
 
-      {/* 7. Subtle Exit Button for Fullscreen/Cinema (Only appears on hover near top right) */}
+      {/* 8. Subtle Exit Button for Fullscreen/Cinema (Only appears on hover near top right) */}
       {isPureCountdownOnly && (
         <div className="fixed top-4 right-4 z-50 opacity-0 hover:opacity-100 transition-opacity duration-300">
           <button
@@ -350,7 +532,7 @@ function AppContent() {
         </div>
       )}
 
-      {/* 8. First-Interaction Audio Unlock Toast */}
+      {/* 9. First-Interaction Audio Unlock Toast */}
       {!hasInteractedAudio && !isPureCountdownOnly && (
         <AudioUnlockBanner
           onDismiss={() => {
@@ -367,7 +549,7 @@ function AppContent() {
         />
       )}
 
-      {/* 9. Modals */}
+      {/* 10. Modals */}
       <BackgroundModal
         isOpen={isBackgroundModalOpen}
         onClose={() => setIsBackgroundModalOpen(false)}
@@ -377,13 +559,25 @@ function AppContent() {
         setActiveBackground={(bg) => {
           setActiveBackground(bg);
           setActiveCustomUrl(undefined);
-          updatePreferences({ activeBackgroundId: bg.id, activeCustomImageUrl: undefined });
+          updatePreferences({
+            activeBackgroundId: bg.id,
+            activeCustomImageUrl: undefined,
+            activeCustomImageId: undefined,
+            activeCustomMediaIsVideo: bg.isVideo,
+          });
+          soundEngine.playSelect();
           showToast(`✓ Wallpaper: ${bg.title}`);
         }}
         activeCustomUrl={activeCustomUrl}
         setActiveCustomUrl={(url) => {
           setActiveCustomUrl(url);
-          updatePreferences({ activeCustomImageUrl: url });
+          const matched = currentUser?.preferences?.customImages?.find(i => i.url === url);
+          updatePreferences({
+            activeCustomImageUrl: url,
+            activeCustomImageId: matched?.id,
+            activeCustomMediaIsVideo: matched?.isVideo,
+          });
+          soundEngine.playSelect();
           showToast('✓ Custom wallpaper applied');
         }}
         activeCountdown={activeCountdown}
@@ -400,6 +594,7 @@ function AppContent() {
         activeCountdownId={activeCountdown.id}
         onSelectCountdown={(id) => {
           updatePreferences({ activeCountdownId: id });
+          soundEngine.playSelect();
         }}
         onOpenNotes={() => setIsNotesDrawerOpen(true)}
       />
@@ -411,6 +606,7 @@ function AppContent() {
         setClockPreset={(preset) => {
           setClockPreset(preset);
           updatePreferences({ clockPreset: preset });
+          soundEngine.playSelect();
           showToast(`✓ Theme: ${preset}`);
         }}
         customSettings={customSettings}
@@ -443,6 +639,7 @@ function AppContent() {
           const next = !isMusicMuted;
           setIsMusicMuted(next);
           soundEngine.setMusicMuted(next);
+          updatePreferences({ isMusicMuted: next });
         }}
         currentTrack={currentTrack}
         setCurrentTrack={setCurrentTrack}
@@ -475,11 +672,13 @@ function AppContent() {
         setMusicVolume={(vol: number) => {
           setMusicVolume(vol);
           soundEngine.setMusicVolume(vol);
+          updatePreferences({ musicVolume: vol });
         }}
         isMusicMuted={isMusicMuted}
         setIsMusicMuted={(muted: boolean) => {
           setIsMusicMuted(muted);
           soundEngine.setMusicMuted(muted);
+          updatePreferences({ isMusicMuted: muted });
         }}
         ambientDrone={ambientDrone}
         setAmbientDrone={(active: boolean) => {

@@ -141,11 +141,14 @@ export const SoundManagerModal: React.FC<SoundManagerModalProps> = ({
     setCurrentTrack(track);
     soundEngine.playTrack(track);
     setIsMusicPlaying(true);
+    updatePreferences({ currentMusicTrackId: track.id, isMusicPlaying: true });
+    soundEngine.playSelect();
   };
 
   const handleTogglePlay = () => {
     const next = soundEngine.toggleMusic();
     setIsMusicPlaying(next);
+    updatePreferences({ isMusicPlaying: next, currentMusicTrackId: currentTrack.id });
   };
 
   const handleAddUrlTrack = (e: React.FormEvent) => {
@@ -356,6 +359,7 @@ export const SoundManagerModal: React.FC<SoundManagerModalProps> = ({
                     const val = parseFloat(e.target.value);
                     setMusicVol(val);
                     soundEngine.setMusicVolume(val);
+                    updatePreferences({ musicVolume: val });
                   }}
                   className="w-48 sm:w-64 accent-emerald-500 cursor-pointer"
                 />
@@ -493,7 +497,7 @@ export const SoundManagerModal: React.FC<SoundManagerModalProps> = ({
                             title="Set this track sound for the countdown clock"
                           >
                             <Clock className="w-3 h-3" />
-                            <span>${soundType === 'custom' && soundEngine.getCustomTickAudioName() === t.title ? 'Clock Tick Active' : 'Match Clock'}</span>
+                            <span>{soundType === 'custom' && soundEngine.getCustomTickAudioName() === t.title ? 'Clock Tick Active' : 'Match Clock'}</span>
                           </button>
 
                           {t.isCustom && (
@@ -638,6 +642,7 @@ export const SoundManagerModal: React.FC<SoundManagerModalProps> = ({
                       const val = parseFloat(e.target.value);
                       setTickVol(val);
                       soundEngine.setClockVolume(val);
+                      updatePreferences({ volume: val });
                     }}
                     className="w-32 sm:w-48 accent-emerald-500 cursor-pointer"
                   />

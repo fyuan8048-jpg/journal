@@ -91,15 +91,30 @@ export const QuickWallpaperBar: React.FC<QuickWallpaperBarProps> = ({
                     key={img.id}
                     onClick={() => {
                       onSelectCustomUrl(img.url);
+                      soundEngine.playSelect();
                     }}
+                    onMouseEnter={() => soundEngine.playUiHover()}
                     className={`group relative flex-shrink-0 w-24 h-24 rounded-2xl overflow-hidden border cursor-pointer transition-all hover:scale-105 ${
                       isSelected
                         ? 'border-emerald-500 ring-2 ring-emerald-500 shadow-[0_0_15px_rgba(0,255,136,0.4)]'
                         : 'border-white/15 hover:border-white/40'
                     }`}
                   >
-                    <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
+                    {img.isVideo ? (
+                      img.thumbnailDataUrl ? (
+                        <img src={img.thumbnailDataUrl} alt={img.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <video src={img.url} muted playsInline className="w-full h-full object-cover" />
+                      )
+                    ) : (
+                      <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
+                    )}
                     <div className="absolute inset-0 bg-black/30 group-hover:bg-transparent transition-colors" />
+                    {img.isVideo && (
+                      <span className="absolute top-1 left-1 px-1 py-0.5 rounded text-[8px] font-black uppercase bg-violet-600/90 text-white">
+                        ▶ Video
+                      </span>
+                    )}
                     {isSelected && (
                       <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-emerald-500 text-black flex items-center justify-center font-bold">
                         <Check className="w-3 h-3 stroke-[3]" />
@@ -120,7 +135,9 @@ export const QuickWallpaperBar: React.FC<QuickWallpaperBarProps> = ({
                     key={item.id}
                     onClick={() => {
                       onSelectCuratedBackground(item);
+                      soundEngine.playSelect();
                     }}
+                    onMouseEnter={() => soundEngine.playUiHover()}
                     className={`group relative flex-shrink-0 w-24 h-24 rounded-2xl overflow-hidden border cursor-pointer transition-all hover:scale-105 ${
                       isSelected
                         ? 'border-emerald-500 ring-2 ring-emerald-500 shadow-[0_0_15px_rgba(0,255,136,0.4)]'
@@ -129,6 +146,11 @@ export const QuickWallpaperBar: React.FC<QuickWallpaperBarProps> = ({
                   >
                     <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-black/30 group-hover:bg-transparent transition-colors" />
+                    {item.isVideo && (
+                      <span className="absolute top-1 left-1 px-1 py-0.5 rounded text-[8px] font-black uppercase bg-violet-600/90 text-white">
+                        ▶ Video
+                      </span>
+                    )}
                     {isSelected && (
                       <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-emerald-500 text-black flex items-center justify-center font-bold">
                         <Check className="w-3 h-3 stroke-[3]" />

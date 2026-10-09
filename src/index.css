@@ -150,3 +150,53 @@ body {
 .animate-glitch {
   animation: glitch 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
 }
+
+/* Micro-interaction & Hover FX */
+.hover-glow {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hover-glow:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 0 25px rgba(0, 255, 136, 0.3);
+}
+
+.hover-glow:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.hover-glow-violet {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hover-glow-violet:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 0 25px rgba(139, 92, 246, 0.35);
+}
+
+.hover-glow-violet:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.active-pulse-ring {
+  box-shadow: 0 0 0 2px rgba(0, 255, 136, 0.6), 0 0 20px rgba(0, 255, 136, 0.4);
+  animation: pulseRing 2.5s infinite;
+}
+
+@keyframes pulseRing {
+  0%, 100% {
+    box-shadow: 0 0 0 2px rgba(0, 255, 136, 0.7), 0 0 20px rgba(0, 255, 136, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(0, 255, 136, 0.9), 0 0 30px rgba(0, 255, 136, 0.6);
+  }
+}
+
+.btn-tactile {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-tactile:hover {
+  transform: translateY(-1px);
+}
+.btn-tactile:active {
+  transform: translateY(1px) scale(0.97);
+}
+

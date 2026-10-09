@@ -7,6 +7,8 @@ export interface BackgroundItem {
   imageUrl: string;
   artistCredit?: string;
   description: string;
+  isVideo?: boolean;
+  videoUrl?: string;
   palette: {
     primary: string;       // Clock glow and primary digits
     secondary: string;     // Labels, subtle borders
@@ -243,6 +245,52 @@ export const CURATED_BACKGROUNDS: BackgroundItem[] = [
     artistCredit: 'Unsplash Archive',
     description: 'A mesmerizing synthwave gradient representing the data streams of the net.',
     palette: { primary: '#8b5cf6', secondary: '#4c1d95', glowColor: 'rgba(139, 92, 246, 0.6)', badgeBg: 'rgba(76, 29, 149, 0.3)', accentHex: '#8b5cf6' }
+  },
+
+  // Motion & Animated Background Art (Videos with Ambient Playback Controls)
+  {
+    id: 'doom-emerald-portal',
+    title: 'Emerald Sorcery Nexus (Motion Loop)',
+    category: 'doom',
+    isVideo: true,
+    videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-hypnotic-glowing-green-lights-32984-large.mp4',
+    imageUrl: makeUnsplashUrl('photo-1519074069444-1ba4fff66d16'),
+    artistCredit: 'Latverian Sorcery Vault',
+    description: 'Pulsing arcane emerald energy radiating from Castle Doomstadt.',
+    palette: { primary: '#00ff88', secondary: '#059669', glowColor: 'rgba(0, 255, 136, 0.65)', badgeBg: 'rgba(5, 150, 105, 0.3)', accentHex: '#00ff88' }
+  },
+  {
+    id: 'marvel-cosmic-singularity',
+    title: 'Deep Space Singularity (Motion Loop)',
+    category: 'marvel',
+    isVideo: true,
+    videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-stars-in-space-1610-large.mp4',
+    imageUrl: makeUnsplashUrl('photo-1506703719100-a0f3a48c0f86'),
+    artistCredit: 'Cosmic Observation Post',
+    description: 'Drifting interstellar stars and dark cosmic tides preceding an incursion.',
+    palette: { primary: '#38bdf8', secondary: '#0284c7', glowColor: 'rgba(56, 189, 248, 0.65)', badgeBg: 'rgba(2, 132, 199, 0.3)', accentHex: '#38bdf8' }
+  },
+  {
+    id: 'cyberpunk-neo-stream',
+    title: 'Neo-City Neon Fog (Motion Loop)',
+    category: 'cyberpunk',
+    isVideo: true,
+    videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-mysterious-neon-lights-in-the-fog-32860-large.mp4',
+    imageUrl: makeUnsplashUrl('photo-1515705576963-95cad62945b6'),
+    artistCredit: 'Neo-Tokyo Cybernetics',
+    description: 'Atmospheric neon lights glowing through cybernetic midnight fog.',
+    palette: { primary: '#f43f5e', secondary: '#be123c', glowColor: 'rgba(244, 63, 94, 0.65)', badgeBg: 'rgba(190, 18, 60, 0.3)', accentHex: '#f43f5e' }
+  },
+  {
+    id: 'battleworld-quantum-void',
+    title: 'Quantum Glitch Void (Motion Loop)',
+    category: 'secretwars',
+    isVideo: true,
+    videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-digital-animation-of-screens-with-glitch-effect-41400-large.mp4',
+    imageUrl: makeUnsplashUrl('photo-1462331940025-496dfbfc7564'),
+    artistCredit: 'Multiversal Loom',
+    description: 'A fracturing timeline glitching across quantum boundaries.',
+    palette: { primary: '#c084fc', secondary: '#7e22ce', glowColor: 'rgba(192, 132, 252, 0.65)', badgeBg: 'rgba(126, 34, 206, 0.3)', accentHex: '#c084fc' }
   }
 ];
 

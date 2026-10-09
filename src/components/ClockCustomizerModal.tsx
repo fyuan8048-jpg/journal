@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { CLOCK_PRESETS, type ClockStylePreset, buildTextShadow } from '../utils/themeAdapter';
 import type { ClockCustomSettings, CountdownEvent, ShadowStyleType } from '../utils/countdown';
+import { soundEngine } from '../audio/soundEngine';
 
 interface ClockCustomizerModalProps {
   isOpen: boolean;
@@ -640,8 +641,10 @@ export const ClockCustomizerModal: React.FC<ClockCustomizerModalProps> = ({
                         fontFamily: conf.fontFamily,
                         titleFontFamily: conf.titleFontFamily,
                       });
+                      soundEngine.playSelect();
                     }}
-                    className={`p-3 rounded-2xl border text-left transition-all hover:scale-[1.02] flex flex-col justify-between ${
+                    onMouseEnter={() => soundEngine.playUiHover()}
+                    className={`p-3 rounded-2xl border text-left transition-all hover:scale-[1.03] active:scale-[0.98] flex flex-col justify-between ${
                       isSelected
                         ? 'bg-neutral-900 border-emerald-400 ring-2 ring-emerald-400/80 shadow-[0_0_20px_rgba(0,255,136,0.3)] text-white'
                         : 'bg-white/[0.03] border-white/10 hover:border-white/25 hover:bg-white/[0.06] text-neutral-300'

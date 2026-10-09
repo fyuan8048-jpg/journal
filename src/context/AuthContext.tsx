@@ -34,6 +34,7 @@ export interface UserCustomImage {
   addedAt: number;
   storageKey?: string;
   thumbnailDataUrl?: string;
+  isVideo?: boolean;
 }
 
 export interface UserProfile {
@@ -57,9 +58,22 @@ export interface UserProfile {
     customCountdowns: CountdownEvent[];
     activeBackgroundId?: string;
     activeCustomImageUrl?: string;
+    activeCustomImageId?: string;
+    activeCustomMediaIsVideo?: boolean;
     clockCustomSettings?: ClockCustomSettings;
     autoRotate24h?: boolean;
     lastRotationTimestamp?: number;
+    // Music & Audio Persistence
+    musicVolume?: number;
+    isMusicMuted?: boolean;
+    currentMusicTrackId?: string;
+    isMusicPlaying?: boolean;
+    customTickSoundName?: string;
+    // Background Video & Motion Controls
+    bgVideoVolume?: number;
+    bgVideoMuted?: boolean;
+    bgVideoPlaying?: boolean;
+    bgVideoSpeed?: number;
   };
 }
 
@@ -70,7 +84,7 @@ interface AuthContextType {
   signup: (email: string, password: string, username: string, avatar?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   updatePreferences: (partial: Partial<UserProfile['preferences']>) => void;
-  addCustomImage: (img: Omit<UserCustomImage, 'id' | 'addedAt'> & { id?: string }) => void;
+  addCustomImage: (img: Omit<UserCustomImage, 'id' | 'addedAt'> & { id?: string; isVideo?: boolean }) => void;
   removeCustomImage: (id: string) => void;
   addCustomCountdown: (event: CountdownEvent) => void;
   updateCountdown: (event: CountdownEvent) => void;
@@ -122,8 +136,18 @@ const DEFAULT_GUEST: UserProfile = {
     ],
     customCountdowns: DEFAULT_COUNTDOWN_EVENTS,
     clockCustomSettings: DEFAULT_CLOCK_CUSTOM_SETTINGS,
-    autoRotate24h: true,
+    autoRotate24h: false,
     lastRotationTimestamp: Date.now(),
+    // Audio defaults
+    musicVolume: 0.5,
+    isMusicMuted: false,
+    currentMusicTrackId: 'doomsday-theme',
+    isMusicPlaying: false,
+    // Video background defaults
+    bgVideoVolume: 0.7,
+    bgVideoMuted: true,
+    bgVideoPlaying: true,
+    bgVideoSpeed: 1.0,
   }
 };
 
@@ -150,6 +174,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {}
     return [DEFAULT_GUEST];
   });
+
+  // Re-hydrate local IndexedDB media on initial load
+  useEffect(() => {
+    const hydrateMediaOnMount = async () => {
+      try {
+        if (currentUser?.preferences?.customImages?.length) {
+          const restored = await restoreImagesFromStorage(currentUser.preferences.customImages);
+          let activeUrl = currentUser.preferences.activeCustomImageUrl;
+          const activeId = currentUser.preferences.activeCustomImageId;
+          let isVideo = currentUser.preferences.activeCustomMediaIsVideo;
+          if (activeId || activeUrl) {
+            const matched = restored.find(
+              i => (activeId && i.id === activeId) ||
+                   (activeUrl && (i.id === activeUrl || i.storageKey === activeUrl || i.url === activeUrl))
+            );
+            if (matched) {
+              activeUrl = matched.url;
+              if (matched.isVideo !== undefined) isVideo = matched.isVideo;
+            }
+          }
+          setCurrentUser(prev => ({
+            ...prev,
+            preferences: {
+              ...prev.preferences,
+              customImages: restored,
+              activeCustomImageUrl: activeUrl,
+              activeCustomMediaIsVideo: isVideo,
+            }
+          }));
+        }
+      } catch (err) {
+        console.warn('Failed to hydrate local media on mount:', err);
+      }
+    };
+    hydrateMediaOnMount();
+  }, []);
 
   useEffect(() => {
     const firestore = db;
@@ -427,11 +487,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCurrentUser(prev => ({ ...prev, preferences: { ...prev.preferences, ...partial } }));
   };
 
-  const addCustomImage = (img: Omit<UserCustomImage, 'id' | 'addedAt'> & { id?: string }) => {
+  const addCustomImage = (img: Omit<UserCustomImage, 'id' | 'addedAt'> & { id?: string; isVideo?: boolean }) => {
     const newImage: UserCustomImage = {
       ...img,
       id: img.id || `img_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       addedAt: Date.now(),
+      isVideo: img.isVideo,
     };
     setCurrentUser(prev => ({
       ...prev,
@@ -439,6 +500,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ...prev.preferences,
         customImages: [newImage, ...prev.preferences.customImages.filter(i => i.id !== newImage.id)],
         activeCustomImageUrl: newImage.url,
+        activeCustomImageId: newImage.id,
+        activeCustomMediaIsVideo: newImage.isVideo,
+        activeBackgroundId: undefined,
       }
     }));
   };

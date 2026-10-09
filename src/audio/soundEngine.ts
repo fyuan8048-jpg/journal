@@ -9,9 +9,11 @@ export interface MusicTrack {
   id: string;
   title: string;
   artist: string;
-  url: string; // Blob URL, web URL, or synthetic generator identifier
+  url: string; // Blob URL, web URL, YouTube URL, or synthetic generator identifier
   isCustom?: boolean;
   isVideo?: boolean;
+  isYouTube?: boolean;
+  youTubeId?: string;
   fileType?: string;
 }
 
@@ -39,6 +41,22 @@ export const BUILTIN_MUSIC_TRACKS: MusicTrack[] = [
     title: 'God Emperor Doom: Battleworld Requiem',
     artist: 'Doomstadt Choir',
     url: 'synthetic:requiem',
+  },
+  {
+    id: 'marvel-lofi-chill',
+    title: 'Marvel Lofi Radio: Beats to Relax / Avenge To',
+    artist: 'Marvel Cinematic Beats (YouTube)',
+    url: 'https://www.youtube.com/watch?v=jfKfPfyJRdk',
+    isYouTube: true,
+    youTubeId: 'jfKfPfyJRdk',
+  },
+  {
+    id: 'cyberpunk-synthwave-stream',
+    title: 'Night City 2077 Cyberpunk Ambient Radio',
+    artist: 'Synthwave Soundscapes (YouTube)',
+    url: 'https://www.youtube.com/watch?v=wA0C0uRx0E4',
+    isYouTube: true,
+    youTubeId: 'wA0C0uRx0E4',
   }
 ];
 
@@ -373,6 +391,10 @@ class SoundEngine {
 
     if (track.url.startsWith('synthetic:')) {
       this.startSyntheticTrack(track.url);
+    } else if (track.isYouTube) {
+      // YouTube tracks are rendered and controlled via YouTube IFrame in React
+      this.isMusicPlaying = true;
+      return;
     } else {
       try {
         if (track.isVideo) {

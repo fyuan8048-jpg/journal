@@ -19,6 +19,7 @@ import { useAuth } from '../context/AuthContext';
 import { soundEngine } from '../audio/soundEngine';
 import { fetchArtworksForCountdown, fetchArtworksFromWeb } from '../utils/artworkFetcher';
 import { compressImage, storeMediaBlob, generateVideoThumbnail } from '../utils/mediaStorage';
+import { parseMediaUrl, fetchLinkMetadata, type ParsedMedia } from '../utils/mediaUrlParser';
 
 interface BackgroundModalProps {
   isOpen: boolean;
@@ -121,15 +122,23 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
   const todayDaily = getDailyBackground(interests, dailyOffset);
   const tomorrowDaily = getDailyBackground(interests, dailyOffset + 1);
 
+  // Media URL Parsing & Detection State
+  const [detectedMedia, setDetectedMedia] = useState<ParsedMedia | null>(null);
+  const [isFetchingMeta, setIsFetchingMeta] = useState(false);
+
   // Unified Wallpaper & Video Activators
-  const handleSelectCustom = (url: string, name?: string, isVideo?: boolean) => {
+  const handleSelectCustom = (url: string, name?: string, isVideo?: boolean, isYouTube?: boolean, youTubeId?: string) => {
     setActiveCustomUrl(url);
     const matched = customImages.find(i => i.url === url || i.id === url);
-    const finalIsVideo = isVideo !== undefined ? isVideo : Boolean(matched?.isVideo || url.match(/\.(mp4|webm|mov|mkv|m4v)(\?.*)?$/i));
+    const finalIsYouTube = isYouTube !== undefined ? isYouTube : Boolean(matched?.isYouTube);
+    const finalYouTubeId = youTubeId || matched?.youTubeId;
+    const finalIsVideo = isVideo !== undefined ? isVideo : Boolean(matched?.isVideo || finalIsYouTube || url.match(/\.(mp4|webm|mov|mkv|m4v)(\?.*)?$/i));
     updatePreferences({
       activeCustomImageUrl: url,
       activeCustomImageId: matched?.id,
       activeCustomMediaIsVideo: finalIsVideo,
+      activeCustomMediaIsYouTube: finalIsYouTube,
+      activeCustomMediaYouTubeId: finalYouTubeId,
       activeBackgroundId: undefined,
     });
     soundEngine.playSelect();
@@ -144,6 +153,8 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
       activeCustomImageUrl: undefined,
       activeCustomImageId: undefined,
       activeCustomMediaIsVideo: item.isVideo,
+      activeCustomMediaIsYouTube: item.isYouTube,
+      activeCustomMediaYouTubeId: item.youTubeId,
     });
     soundEngine.playSelect();
     showToast(`✓ Wallpaper applied: ${item.title}`);
@@ -157,6 +168,8 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
       activeCustomImageUrl: undefined,
       activeCustomImageId: undefined,
       activeCustomMediaIsVideo: item.isVideo,
+      activeCustomMediaIsYouTube: item.isYouTube,
+      activeCustomMediaYouTubeId: item.youTubeId,
       lastRotationTimestamp: Date.now()
     });
     soundEngine.playSelect();
@@ -181,8 +194,11 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
     addCustomImage({
       name: item.title,
       url: item.videoUrl || item.imageUrl,
-      collectionName: 'Web Saved Art',
+      collectionName: item.isYouTube ? 'YouTube Ambient Loops' : 'Web Saved Art',
       isVideo: item.isVideo,
+      isYouTube: item.isYouTube,
+      youTubeId: item.youTubeId,
+      thumbnailDataUrl: item.imageUrl,
     });
     soundEngine.playSuccessCheck();
     showToast(`✓ Saved "${item.title}" to My Wallpapers!`);
@@ -195,7 +211,30 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
     }
   };
 
-  // Handle URL Add (Supports Images, Web Videos & Animations)
+  // Listen to URL input changes to auto-detect YouTube and fetch title/thumbnail
+  const handleUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setNewImageUrl(val);
+    if (!val.trim()) {
+      setDetectedMedia(null);
+      return;
+    }
+    const parsed = parseMediaUrl(val);
+    setDetectedMedia(parsed);
+
+    if (parsed.type === 'youtube' && parsed.id) {
+      setIsFetchingMeta(true);
+      try {
+        const meta = await fetchLinkMetadata(val);
+        if (!newImageName || newImageName.startsWith('YouTube:')) {
+          setNewImageName(meta.title);
+        }
+      } catch {}
+      setIsFetchingMeta(false);
+    }
+  };
+
+  // Handle URL Add (Supports YouTube, Web Videos, Motion Loops & Images)
   const handleAddUrl = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newImageUrl.trim()) return;
@@ -207,21 +246,29 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
     }
 
     const trimmed = newImageUrl.trim();
-    const isVideo = Boolean(trimmed.match(/\.(mp4|webm|mov|mkv|m4v)(\?.*)?$/i));
-    const title = newImageName.trim() || (isVideo ? 'Custom Motion Video' : 'Custom Artwork');
+    const parsed = parseMediaUrl(trimmed);
+    const isYouTube = parsed.type === 'youtube';
+    const isVideo = isYouTube || parsed.type === 'video' || Boolean(trimmed.match(/\.(mp4|webm|mov|mkv|m4v)(\?.*)?$/i));
+    const youTubeId = isYouTube ? parsed.id : undefined;
+    const title = newImageName.trim() || parsed.defaultTitle || (isVideo ? 'Custom Motion Video' : 'Custom Artwork');
     const mediaId = `media_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const thumbnailDataUrl = isYouTube && parsed.id ? `https://img.youtube.com/vi/${parsed.id}/hqdefault.jpg` : parsed.thumbnailUrl;
 
     addCustomImage({
       id: mediaId,
       name: title,
       url: trimmed,
-      collectionName: collectionName.trim() || 'Custom Media',
+      collectionName: isYouTube ? 'YouTube Ambient Media' : (collectionName.trim() || 'Custom Media'),
       isVideo,
+      isYouTube,
+      youTubeId,
+      thumbnailDataUrl,
     });
 
-    handleSelectCustom(trimmed, title, isVideo);
+    handleSelectCustom(trimmed, title, isVideo, isYouTube, youTubeId);
     setNewImageUrl('');
     setNewImageName('');
+    setDetectedMedia(null);
     setUploadError('');
   };
 
@@ -422,10 +469,19 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
-                      <div className="absolute top-3 left-3">
+                      <div className="absolute top-3 left-3 flex items-center gap-1.5">
                         <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-black/70 backdrop-blur-md border border-white/10 text-neutral-200">
                           {item.category}
                         </span>
+                        {item.isYouTube ? (
+                          <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-rose-600/90 text-white shadow-md flex items-center gap-0.5">
+                            ▶ YouTube
+                          </span>
+                        ) : item.isVideo ? (
+                          <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-violet-600/90 text-white shadow-md flex items-center gap-0.5">
+                            ▶ Motion
+                          </span>
+                        ) : null}
                       </div>
                       {isActive && (
                         <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-emerald-500 text-black text-[10px] font-black uppercase flex items-center gap-1 shadow-[0_0_10px_rgba(0,255,136,0.8)]">
@@ -748,23 +804,41 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
                   </label>
                 </div>
 
-                {/* Direct Image or Video URL Add */}
+                {/* Direct Image, Video, or YouTube URL Add */}
                 <form
                   onSubmit={handleAddUrl}
                   className="p-5 rounded-2xl bg-white/5 border border-white/10 flex flex-col justify-between"
                 >
                   <div>
-                    <p className="text-sm font-bold text-white mb-2">Add via Direct URL (Image or Video)</p>
-                    <input
-                      type="url"
-                      placeholder="Paste image or video URL (https://... .mp4, .webm, .jpg)"
-                      value={newImageUrl}
-                      onChange={e => setNewImageUrl(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-white/10 text-white placeholder-neutral-500 text-xs focus:outline-none focus:border-emerald-500 mb-2"
-                    />
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-bold text-white">Add via Web or YouTube URL</p>
+                      {detectedMedia && (
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                          detectedMedia.type === 'youtube'
+                            ? 'bg-rose-950 border border-rose-500/50 text-rose-300'
+                            : detectedMedia.type === 'video'
+                            ? 'bg-violet-950 border border-violet-500/50 text-violet-300'
+                            : 'bg-emerald-950 border border-emerald-500/50 text-emerald-300'
+                        }`}>
+                          {detectedMedia.type === 'youtube' ? '▶ YouTube Stream' : detectedMedia.type === 'video' ? '🎬 Web Video' : '🖼️ Web Image'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative mb-2">
+                      <input
+                        type="url"
+                        placeholder="Paste YouTube link (watch, shorts, embed) or video/image URL"
+                        value={newImageUrl}
+                        onChange={handleUrlChange}
+                        className="w-full px-3 py-2 pr-8 rounded-xl bg-neutral-900 border border-white/10 text-white placeholder-neutral-500 text-xs focus:outline-none focus:border-emerald-500"
+                      />
+                      {isFetchingMeta && (
+                        <Loader2 className="absolute right-2.5 top-2.5 w-4 h-4 text-emerald-400 animate-spin" />
+                      )}
+                    </div>
                     <input
                       type="text"
-                      placeholder="Title / Description (optional)"
+                      placeholder="Title / Description (autofilled for YouTube)"
                       value={newImageName}
                       onChange={e => setNewImageName(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-white/10 text-white placeholder-neutral-500 text-xs focus:outline-none focus:border-emerald-500"
@@ -793,7 +867,7 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
                 {customImages.length === 0 ? (
                   <div className="py-12 text-center text-neutral-500 border border-dashed border-white/10 rounded-2xl">
                     <p className="text-sm">No custom wallpapers or videos saved yet.</p>
-                    <p className="text-xs text-neutral-600 mt-1">Upload an image, video, or explore the Curated motion loops.</p>
+                    <p className="text-xs text-neutral-600 mt-1">Upload an image, video, paste a YouTube link, or explore Curated motion loops.</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -802,7 +876,7 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
                       return (
                         <div
                           key={img.id}
-                          onClick={() => handleSelectCustom(img.url, img.name, img.isVideo)}
+                          onClick={() => handleSelectCustom(img.url, img.name, img.isVideo, img.isYouTube, img.youTubeId)}
                           onMouseEnter={() => soundEngine.playUiHover()}
                           className={`group relative h-48 rounded-2xl overflow-hidden border cursor-pointer transition-all hover:scale-[1.02] ${
                             isActive
@@ -810,7 +884,14 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
                               : 'border-white/10 hover:border-emerald-500/50'
                           }`}
                         >
-                          {img.isVideo ? (
+                          {img.isYouTube ? (
+                            <img
+                              src={img.thumbnailDataUrl || (img.youTubeId ? `https://img.youtube.com/vi/${img.youTubeId}/hqdefault.jpg` : img.url)}
+                              alt={img.name}
+                              loading="lazy"
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            />
+                          ) : img.isVideo ? (
                             img.thumbnailDataUrl ? (
                               <img
                                 src={img.thumbnailDataUrl}
@@ -849,11 +930,15 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
                           </button>
 
                           <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
-                            {img.isVideo && (
+                            {img.isYouTube ? (
+                              <div className="px-2 py-0.5 rounded-md bg-rose-600/90 text-white text-[10px] font-black uppercase flex items-center gap-1 shadow-md">
+                                ▶ YouTube
+                              </div>
+                            ) : img.isVideo ? (
                               <div className="px-2 py-0.5 rounded-md bg-violet-600/90 text-white text-[10px] font-black uppercase flex items-center gap-1 shadow-md">
                                 ▶ Video
                               </div>
-                            )}
+                            ) : null}
                             {isActive && (
                               <div className="px-2.5 py-1 rounded-lg bg-emerald-500 text-black text-[10px] font-black uppercase flex items-center gap-1.5 shadow-[0_0_10px_rgba(0,255,136,0.6)]">
                                 <Check className="w-3.5 h-3.5 stroke-[3]" /> Active

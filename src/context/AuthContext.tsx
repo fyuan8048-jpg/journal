@@ -35,6 +35,8 @@ export interface UserCustomImage {
   storageKey?: string;
   thumbnailDataUrl?: string;
   isVideo?: boolean;
+  isYouTube?: boolean;
+  youTubeId?: string;
 }
 
 export interface UserProfile {
@@ -60,6 +62,8 @@ export interface UserProfile {
     activeCustomImageUrl?: string;
     activeCustomImageId?: string;
     activeCustomMediaIsVideo?: boolean;
+    activeCustomMediaIsYouTube?: boolean;
+    activeCustomMediaYouTubeId?: string;
     clockCustomSettings?: ClockCustomSettings;
     autoRotate24h?: boolean;
     lastRotationTimestamp?: number;
@@ -67,6 +71,7 @@ export interface UserProfile {
     musicVolume?: number;
     isMusicMuted?: boolean;
     currentMusicTrackId?: string;
+    currentMusicYouTubeId?: string;
     isMusicPlaying?: boolean;
     customTickSoundName?: string;
     // Background Video & Motion Controls
@@ -84,7 +89,7 @@ interface AuthContextType {
   signup: (email: string, password: string, username: string, avatar?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   updatePreferences: (partial: Partial<UserProfile['preferences']>) => void;
-  addCustomImage: (img: Omit<UserCustomImage, 'id' | 'addedAt'> & { id?: string; isVideo?: boolean }) => void;
+  addCustomImage: (img: Omit<UserCustomImage, 'id' | 'addedAt'> & { id?: string; isVideo?: boolean; isYouTube?: boolean; youTubeId?: string }) => void;
   removeCustomImage: (id: string) => void;
   addCustomCountdown: (event: CountdownEvent) => void;
   updateCountdown: (event: CountdownEvent) => void;
@@ -487,12 +492,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCurrentUser(prev => ({ ...prev, preferences: { ...prev.preferences, ...partial } }));
   };
 
-  const addCustomImage = (img: Omit<UserCustomImage, 'id' | 'addedAt'> & { id?: string; isVideo?: boolean }) => {
+  const addCustomImage = (img: Omit<UserCustomImage, 'id' | 'addedAt'> & { id?: string; isVideo?: boolean; isYouTube?: boolean; youTubeId?: string }) => {
     const newImage: UserCustomImage = {
       ...img,
       id: img.id || `img_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       addedAt: Date.now(),
       isVideo: img.isVideo,
+      isYouTube: img.isYouTube,
+      youTubeId: img.youTubeId,
     };
     setCurrentUser(prev => ({
       ...prev,
@@ -502,6 +509,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         activeCustomImageUrl: newImage.url,
         activeCustomImageId: newImage.id,
         activeCustomMediaIsVideo: newImage.isVideo,
+        activeCustomMediaIsYouTube: newImage.isYouTube,
+        activeCustomMediaYouTubeId: newImage.youTubeId,
         activeBackgroundId: undefined,
       }
     }));

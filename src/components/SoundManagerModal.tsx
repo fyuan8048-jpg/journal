@@ -15,10 +15,12 @@ import {
   Film,
   Clock,
   Sparkles,
+  Loader2,
 } from 'lucide-react';
 import { soundEngine, type SoundEffectType, type MusicTrack, BUILTIN_MUSIC_TRACKS } from '../audio/soundEngine';
 import { useAuth } from '../context/AuthContext';
 import { get, set as idbSet, del as idbDel } from 'idb-keyval';
+import { parseMediaUrl, fetchLinkMetadata, type ParsedMedia } from '../utils/mediaUrlParser';
 
 interface SoundManagerModalProps {
   isOpen: boolean;
@@ -55,6 +57,8 @@ export const SoundManagerModal: React.FC<SoundManagerModalProps> = ({
   const [trackArtist, setTrackArtist] = useState('');
   const [trackUrl, setTrackUrl] = useState('');
   const [customTracks, setCustomTracks] = useState<MusicTrack[]>([]);
+  const [detectedTrackMedia, setDetectedTrackMedia] = useState<ParsedMedia | null>(null);
+  const [isFetchingTrackMeta, setIsFetchingTrackMeta] = useState(false);
   const [musicVol, setMusicVol] = useState(soundEngine.getMusicVolume());
   const [tickVol, setTickVol] = useState(soundEngine.getClockVolume());
   const [error, setError] = useState('');
@@ -108,7 +112,7 @@ export const SoundManagerModal: React.FC<SoundManagerModalProps> = ({
     setError('');
   };
 
-  // Re-hydrate custom tracks on load from IndexedDB
+  // Re-hydrate custom tracks on load from IndexedDB or stored web/YouTube URLs
   useEffect(() => {
     try {
       const savedMetadata = localStorage.getItem(STORAGE_KEY_CUSTOM_TRACKS);
@@ -116,7 +120,7 @@ export const SoundManagerModal: React.FC<SoundManagerModalProps> = ({
         const parsed: MusicTrack[] = JSON.parse(savedMetadata);
         Promise.all(
           parsed.map(async (t) => {
-            if (t.isCustom && !t.url.startsWith('http')) {
+            if (t.isCustom && (!t.url || t.url === '') && !t.isYouTube) {
               try {
                 const blob = await get(`media_blob_${t.id}`);
                 if (blob instanceof Blob) {
@@ -141,7 +145,11 @@ export const SoundManagerModal: React.FC<SoundManagerModalProps> = ({
     setCurrentTrack(track);
     soundEngine.playTrack(track);
     setIsMusicPlaying(true);
-    updatePreferences({ currentMusicTrackId: track.id, isMusicPlaying: true });
+    updatePreferences({
+      currentMusicTrackId: track.id,
+      currentMusicYouTubeId: track.isYouTube ? track.youTubeId : undefined,
+      isMusicPlaying: true,
+    });
     soundEngine.playSelect();
   };
 
@@ -151,33 +159,72 @@ export const SoundManagerModal: React.FC<SoundManagerModalProps> = ({
     updatePreferences({ isMusicPlaying: next, currentMusicTrackId: currentTrack.id });
   };
 
+  // Listen to track URL changes to auto-detect YouTube and autofill title/artist
+  const handleTrackUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setTrackUrl(val);
+    if (!val.trim()) {
+      setDetectedTrackMedia(null);
+      return;
+    }
+    const parsed = parseMediaUrl(val);
+    setDetectedTrackMedia(parsed);
+
+    if (parsed.type === 'youtube' && parsed.id) {
+      setIsFetchingTrackMeta(true);
+      try {
+        const meta = await fetchLinkMetadata(val);
+        if (!trackTitle || trackTitle.startsWith('YouTube:')) {
+          setTrackTitle(meta.title);
+        }
+        if (!trackArtist) {
+          setTrackArtist(meta.author);
+        }
+      } catch {}
+      setIsFetchingTrackMeta(false);
+    }
+  };
+
   const handleAddUrlTrack = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!trackTitle.trim() || !trackUrl.trim()) {
-      setError('Please provide a title and media URL');
+    if (!trackUrl.trim()) {
+      setError('Please provide a media stream URL or YouTube link');
       return;
     }
 
-    const isVideo = !!trackUrl.match(/\.(mp4|webm|mov|mkv|m4v)/i);
+    const trimmed = trackUrl.trim();
+    const parsed = parseMediaUrl(trimmed);
+    const isYouTube = parsed.type === 'youtube';
+    const youTubeId = isYouTube ? parsed.id : undefined;
+    const isVideo = isYouTube || parsed.type === 'video' || !!trimmed.match(/\.(mp4|webm|mov|mkv|m4v)/i);
+    const title = trackTitle.trim() || parsed.defaultTitle || (isVideo ? 'Web Video Soundtrack' : 'Web Audio Stream');
+    const artist = trackArtist.trim() || (isYouTube ? 'YouTube Soundtrack' : (currentUser?.username || 'Web Stream'));
+
     const newTrack: MusicTrack = {
       id: `custom_music_${Date.now()}`,
-      title: trackTitle.trim(),
-      artist: trackArtist.trim() || currentUser?.username || (isVideo ? 'Web Video Soundtrack' : 'Web Audio Stream'),
-      url: trackUrl.trim(),
+      title,
+      artist,
+      url: trimmed,
       isCustom: true,
       isVideo,
+      isYouTube,
+      youTubeId,
     };
 
     const updated = [newTrack, ...customTracks];
     setCustomTracks(updated);
     try {
-      localStorage.setItem(STORAGE_KEY_CUSTOM_TRACKS, JSON.stringify(updated.map(t => ({ ...t, url: t.url.startsWith('blob:') ? '' : t.url }))));
+      localStorage.setItem(STORAGE_KEY_CUSTOM_TRACKS, JSON.stringify(updated.map(t => ({
+        ...t,
+        url: t.url.startsWith('blob:') ? '' : t.url
+      }))));
     } catch {}
 
     handleSelectTrack(newTrack);
     setTrackTitle('');
     setTrackArtist('');
     setTrackUrl('');
+    setDetectedTrackMedia(null);
     setError('');
   };
 
@@ -403,27 +450,53 @@ export const SoundManagerModal: React.FC<SoundManagerModalProps> = ({
                     />
                   </label>
 
-                  {/* URL Input (Audio or Video stream) */}
+                  {/* URL Input (Audio, Video stream or YouTube) */}
                   <form onSubmit={handleAddUrlTrack} className="space-y-2 flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-neutral-300">Add via Web or YouTube URL</span>
+                      {detectedTrackMedia && (
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
+                          detectedTrackMedia.type === 'youtube'
+                            ? 'bg-rose-950 border border-rose-500/50 text-rose-300'
+                            : detectedTrackMedia.type === 'video'
+                            ? 'bg-violet-950 border border-violet-500/50 text-violet-300'
+                            : 'bg-emerald-950 border border-emerald-500/50 text-emerald-300'
+                        }`}>
+                          {detectedTrackMedia.type === 'youtube' ? '▶ YouTube Audio' : detectedTrackMedia.type === 'video' ? '🎬 Video OST' : '🎵 Web Audio'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="url"
+                        placeholder="Paste YouTube (watch, shorts) or MP3/MP4 URL"
+                        value={trackUrl}
+                        onChange={handleTrackUrlChange}
+                        className="w-full px-3 py-1.5 pr-8 rounded-lg bg-black border border-neutral-700 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-emerald-500"
+                      />
+                      {isFetchingTrackMeta && (
+                        <Loader2 className="absolute right-2.5 top-2 w-3.5 h-3.5 text-emerald-400 animate-spin" />
+                      )}
+                    </div>
                     <input
                       type="text"
-                      placeholder="Track Title (e.g. Doomsday Trailer Theme)"
+                      placeholder="Track Title (autofilled for YouTube)"
                       value={trackTitle}
                       onChange={e => setTrackTitle(e.target.value)}
-                      className="w-full px-3 py-1.5 rounded-lg bg-black border border-neutral-700 text-xs text-white"
+                      className="w-full px-3 py-1.5 rounded-lg bg-black border border-neutral-700 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-emerald-500"
                     />
                     <input
-                      type="url"
-                      placeholder="Media Stream URL (MP3, MP4, WEBM link)"
-                      value={trackUrl}
-                      onChange={e => setTrackUrl(e.target.value)}
-                      className="w-full px-3 py-1.5 rounded-lg bg-black border border-neutral-700 text-xs text-white"
+                      type="text"
+                      placeholder="Artist / Channel (optional)"
+                      value={trackArtist}
+                      onChange={e => setTrackArtist(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg bg-black border border-neutral-700 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-emerald-500"
                     />
                     <button
                       type="submit"
                       className="w-full py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all shadow-[0_0_12px_rgba(0,255,136,0.3)]"
                     >
-                      Add & Play Media
+                      Add &amp; Play Soundtrack
                     </button>
                   </form>
                 </div>
@@ -456,6 +529,8 @@ export const SoundManagerModal: React.FC<SoundManagerModalProps> = ({
                           >
                             {isSelected && isMusicPlaying ? (
                               <Radio className="w-4 h-4 animate-pulse" />
+                            ) : t.isYouTube ? (
+                              <Play className="w-4 h-4 text-rose-400" />
                             ) : t.isVideo ? (
                               <Film className="w-4 h-4" />
                             ) : (
@@ -467,12 +542,17 @@ export const SoundManagerModal: React.FC<SoundManagerModalProps> = ({
                               <p className="text-xs sm:text-sm font-bold text-white truncate max-w-[200px] sm:max-w-md">
                                 {t.title}
                               </p>
-                              {t.isVideo && (
+                              {t.isYouTube && (
+                                <span className="px-1.5 py-0.5 rounded bg-rose-950/80 border border-rose-500/40 text-[9px] text-rose-300 font-bold uppercase shrink-0 flex items-center gap-0.5">
+                                  ▶ YOUTUBE
+                                </span>
+                              )}
+                              {!t.isYouTube && t.isVideo && (
                                 <span className="px-1.5 py-0.5 rounded bg-sky-950/80 border border-sky-500/40 text-[9px] text-sky-300 font-bold uppercase shrink-0">
                                   VIDEO OST
                                 </span>
                               )}
-                              {t.isCustom && !t.isVideo && (
+                              {!t.isYouTube && t.isCustom && !t.isVideo && (
                                 <span className="px-1.5 py-0.5 rounded bg-emerald-950/80 border border-emerald-500/40 text-[9px] text-emerald-300 font-bold uppercase shrink-0">
                                   AUDIO
                                 </span>

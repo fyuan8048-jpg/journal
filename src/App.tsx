@@ -24,6 +24,7 @@ import {
   type ClockCustomSettings,
 } from './utils/countdown';
 import { Minimize2, Check } from 'lucide-react';
+import { extractYouTubeId, sendYouTubeCommand } from './utils/mediaUrlParser';
 
 function AppContent() {
   const { currentUser, updatePreferences } = useAuth();
@@ -75,6 +76,8 @@ function AppContent() {
   const [isBgVideoPlaying, setIsBgVideoPlaying] = useState<boolean>(preferences?.bgVideoPlaying ?? true);
   const [bgVideoSpeed, setBgVideoSpeed] = useState<number>(preferences?.bgVideoSpeed ?? 1.0);
   const bgVideoRef = useRef<HTMLVideoElement>(null);
+  const bgYouTubeIframeRef = useRef<HTMLIFrameElement>(null);
+  const musicYouTubeIframeRef = useRef<HTMLIFrameElement>(null);
 
   // Clock Style & Display Settings
   const [clockPreset, setClockPreset] = useState<ClockStylePreset>(preferences?.clockPreset ?? 'doomsday');
@@ -132,7 +135,20 @@ function AppContent() {
     }
     if (preferences?.currentMusicTrackId) {
       const found = BUILTIN_MUSIC_TRACKS.find(t => t.id === preferences.currentMusicTrackId);
-      if (found) setCurrentTrack(found);
+      if (found) {
+        setCurrentTrack(found);
+      } else if (preferences.currentMusicYouTubeId) {
+        setCurrentTrack({
+          id: preferences.currentMusicTrackId,
+          title: 'Custom YouTube Soundtrack',
+          artist: 'YouTube Stream',
+          url: `https://www.youtube.com/watch?v=${preferences.currentMusicYouTubeId}`,
+          isCustom: true,
+          isVideo: true,
+          isYouTube: true,
+          youTubeId: preferences.currentMusicYouTubeId,
+        });
+      }
     }
     if (preferences?.bgVideoVolume !== undefined) setBgVideoVolume(preferences.bgVideoVolume);
     if (preferences?.bgVideoMuted !== undefined) setIsBgVideoMuted(preferences.bgVideoMuted);
@@ -146,11 +162,29 @@ function AppContent() {
     preferences?.musicVolume,
     preferences?.isMusicMuted,
     preferences?.currentMusicTrackId,
+    preferences?.currentMusicYouTubeId,
     preferences?.bgVideoVolume,
     preferences?.bgVideoMuted,
     preferences?.bgVideoPlaying,
     preferences?.bgVideoSpeed,
   ]);
+
+  // Synchronize offscreen YouTube audio player iframe commands
+  useEffect(() => {
+    if (currentTrack.isYouTube && currentTrack.youTubeId && musicYouTubeIframeRef.current) {
+      if (isMusicPlaying) {
+        sendYouTubeCommand(musicYouTubeIframeRef.current, 'playVideo');
+      } else {
+        sendYouTubeCommand(musicYouTubeIframeRef.current, 'pauseVideo');
+      }
+      if (isMusicMuted) {
+        sendYouTubeCommand(musicYouTubeIframeRef.current, 'mute');
+      } else {
+        sendYouTubeCommand(musicYouTubeIframeRef.current, 'unMute');
+        sendYouTubeCommand(musicYouTubeIframeRef.current, 'setVolume', [Math.round(musicVolume * 100)]);
+      }
+    }
+  }, [isMusicPlaying, isMusicMuted, musicVolume, currentTrack]);
 
   // Synchronize video element properties directly
   useEffect(() => {
@@ -282,12 +316,44 @@ function AppContent() {
     soundEngine.playSelect();
   };
 
-  // Background Video Control Handlers
+  // Background Media Detection (YouTube vs Video vs Image)
+  const isCurrentBgYouTube = Boolean(
+    (activeCustomUrl && (
+      preferences?.activeCustomMediaIsYouTube ||
+      extractYouTubeId(activeCustomUrl) !== null ||
+      currentUser?.preferences?.customImages?.find(
+        i => i.url === activeCustomUrl || i.id === preferences?.activeCustomImageId
+      )?.isYouTube
+    )) ||
+    (!activeCustomUrl && activeBackground?.isYouTube)
+  );
+
+  const currentBgYouTubeId =
+    (activeCustomUrl && (preferences?.activeCustomMediaYouTubeId || extractYouTubeId(activeCustomUrl))) ||
+    (!activeCustomUrl && activeBackground?.youTubeId) ||
+    '';
+
+  const isCurrentBgVideo = isCurrentBgYouTube || Boolean(
+    (activeCustomUrl && (
+      activeCustomUrl.match(/\.(mp4|webm|mov|mkv|m4v)(\?.*)?$/i) ||
+      preferences?.activeCustomMediaIsVideo ||
+      currentUser?.preferences?.customImages?.find(
+        i => i.url === activeCustomUrl || i.id === preferences?.activeCustomImageId
+      )?.isVideo
+    )) ||
+    (!activeCustomUrl && (activeBackground?.isVideo || activeBackground?.videoUrl))
+  );
+
+  const currentBgMedia = activeCustomUrl || (activeBackground.isVideo && activeBackground.videoUrl ? activeBackground.videoUrl : activeBackground.imageUrl);
+
+  // Background Video & YouTube Control Handlers
   const handleToggleBgVideoPlay = () => {
     const next = !isBgVideoPlaying;
     setIsBgVideoPlaying(next);
     updatePreferences({ bgVideoPlaying: next });
-    if (bgVideoRef.current) {
+    if (isCurrentBgYouTube && bgYouTubeIframeRef.current) {
+      sendYouTubeCommand(bgYouTubeIframeRef.current, next ? 'playVideo' : 'pauseVideo');
+    } else if (bgVideoRef.current) {
       if (next) bgVideoRef.current.play().catch(() => {});
       else bgVideoRef.current.pause();
     }
@@ -297,7 +363,14 @@ function AppContent() {
     const next = !isBgVideoMuted;
     setIsBgVideoMuted(next);
     updatePreferences({ bgVideoMuted: next });
-    if (bgVideoRef.current) {
+    if (isCurrentBgYouTube && bgYouTubeIframeRef.current) {
+      if (next) {
+        sendYouTubeCommand(bgYouTubeIframeRef.current, 'mute');
+      } else {
+        sendYouTubeCommand(bgYouTubeIframeRef.current, 'unMute');
+        sendYouTubeCommand(bgYouTubeIframeRef.current, 'setVolume', [Math.round(bgVideoVolume * 100)]);
+      }
+    } else if (bgVideoRef.current) {
       bgVideoRef.current.muted = next;
       bgVideoRef.current.volume = next ? 0 : bgVideoVolume;
     }
@@ -306,7 +379,14 @@ function AppContent() {
   const handleBgVideoVolumeChange = (vol: number) => {
     setBgVideoVolume(vol);
     updatePreferences({ bgVideoVolume: vol });
-    if (bgVideoRef.current) {
+    if (isCurrentBgYouTube && bgYouTubeIframeRef.current) {
+      sendYouTubeCommand(bgYouTubeIframeRef.current, 'setVolume', [Math.round(vol * 100)]);
+      if (vol > 0 && isBgVideoMuted) {
+        setIsBgVideoMuted(false);
+        sendYouTubeCommand(bgYouTubeIframeRef.current, 'unMute');
+        updatePreferences({ bgVideoMuted: false });
+      }
+    } else if (bgVideoRef.current) {
       bgVideoRef.current.volume = vol;
       if (vol > 0 && isBgVideoMuted) {
         setIsBgVideoMuted(false);
@@ -328,20 +408,6 @@ function AppContent() {
   const backgroundPalette = activeCustomUrl ? undefined : activeBackground.palette;
   const adaptedTheme = getAdaptedTheme(clockPreset, backgroundPalette, customSettings);
 
-  // Background Media Detection (Video vs Image)
-  const isCurrentBgVideo = Boolean(
-    (activeCustomUrl && (
-      activeCustomUrl.match(/\.(mp4|webm|mov|mkv|m4v)(\?.*)?$/i) ||
-      preferences?.activeCustomMediaIsVideo ||
-      currentUser?.preferences?.customImages?.find(
-        i => i.url === activeCustomUrl || i.id === preferences?.activeCustomImageId
-      )?.isVideo
-    )) ||
-    (!activeCustomUrl && (activeBackground?.isVideo || activeBackground?.videoUrl))
-  );
-
-  const currentBgMedia = activeCustomUrl || (activeBackground.isVideo && activeBackground.videoUrl ? activeBackground.videoUrl : activeBackground.imageUrl);
-
   // Pure Clean View Condition: in full screen OR cinema mode, ONLY the countdown is visible!
   const isPureCountdownOnly = isCinemaMode || isFullscreen;
 
@@ -358,8 +424,20 @@ function AppContent() {
       }}
       className="relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden bg-black text-white"
     >
-      {/* 1. Base Comic / Marvel Artwork or Motion Video Background */}
-      {isCurrentBgVideo ? (
+      {/* 1. Base Comic / Marvel Artwork, Motion Video, or Ambient YouTube Background */}
+      {isCurrentBgYouTube && currentBgYouTubeId ? (
+        <div className="absolute inset-0 w-full h-full overflow-hidden select-none pointer-events-none transition-opacity duration-700">
+          <iframe
+            ref={bgYouTubeIframeRef}
+            key={`yt-bg-${currentBgYouTubeId}`}
+            src={`https://www.youtube.com/embed/${currentBgYouTubeId}?autoplay=1&mute=${isBgVideoMuted ? 1 : 0}&controls=0&loop=1&playlist=${currentBgYouTubeId}&playsinline=1&rel=0&showinfo=0&modestbranding=1&enablejsapi=1&origin=${typeof window !== 'undefined' ? encodeURIComponent(window.location.origin) : ''}`}
+            title="Ambient Motion Background"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            className="absolute -top-[12%] -left-[12%] w-[124%] h-[124%] object-cover pointer-events-none border-none scale-105"
+            style={{ pointerEvents: 'none' }}
+          />
+        </div>
+      ) : isCurrentBgVideo ? (
         <video
           ref={bgVideoRef}
           key={currentBgMedia}
@@ -485,6 +563,8 @@ function AppContent() {
               activeCustomImageUrl: undefined,
               activeCustomImageId: undefined,
               activeCustomMediaIsVideo: bg.isVideo,
+              activeCustomMediaIsYouTube: bg.isYouTube,
+              activeCustomMediaYouTubeId: bg.youTubeId,
             });
             soundEngine.playSelect();
             showToast(`✓ Wallpaper applied: ${bg.title}`);
@@ -492,11 +572,14 @@ function AppContent() {
           activeCustomUrl={activeCustomUrl}
           onSelectCustomUrl={(url) => {
             setActiveCustomUrl(url);
-            const matched = currentUser?.preferences?.customImages?.find(i => i.url === url);
+            const matched = currentUser?.preferences?.customImages?.find(i => i.url === url || i.id === url);
             updatePreferences({
               activeCustomImageUrl: url,
               activeCustomImageId: matched?.id,
               activeCustomMediaIsVideo: matched?.isVideo,
+              activeCustomMediaIsYouTube: matched?.isYouTube,
+              activeCustomMediaYouTubeId: matched?.youTubeId,
+              activeBackgroundId: undefined,
             });
             soundEngine.playSelect();
             showToast('✓ Custom wallpaper applied');
@@ -514,6 +597,20 @@ function AppContent() {
           setIsMusicPlaying={setIsMusicPlaying}
           onOpenSoundStudio={() => setIsSoundStudioOpen(true)}
         />
+      )}
+
+      {/* Offscreen YouTube Soundtrack Stream (Zero latency audio sync) */}
+      {currentTrack.isYouTube && currentTrack.youTubeId && (
+        <div className="hidden pointer-events-none w-0 h-0" aria-hidden="true">
+          <iframe
+            ref={musicYouTubeIframeRef}
+            key={`yt-audio-${currentTrack.youTubeId}`}
+            src={`https://www.youtube.com/embed/${currentTrack.youTubeId}?autoplay=${isMusicPlaying ? 1 : 0}&mute=${isMusicMuted ? 1 : 0}&controls=0&loop=1&playlist=${currentTrack.youTubeId}&playsinline=1&enablejsapi=1&origin=${typeof window !== 'undefined' ? encodeURIComponent(window.location.origin) : ''}`}
+            title="Background Music Player"
+            allow="autoplay"
+            className="w-0 h-0 border-none"
+          />
+        </div>
       )}
 
       {/* 8. Subtle Exit Button for Fullscreen/Cinema (Only appears on hover near top right) */}

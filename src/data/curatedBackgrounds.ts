@@ -9,6 +9,8 @@ export interface BackgroundItem {
   description: string;
   isVideo?: boolean;
   videoUrl?: string;
+  isYouTube?: boolean;
+  youTubeId?: string;
   palette: {
     primary: string;       // Clock glow and primary digits
     secondary: string;     // Labels, subtle borders
@@ -291,6 +293,32 @@ export const CURATED_BACKGROUNDS: BackgroundItem[] = [
     artistCredit: 'Multiversal Loom',
     description: 'A fracturing timeline glitching across quantum boundaries.',
     palette: { primary: '#c084fc', secondary: '#7e22ce', glowColor: 'rgba(192, 132, 252, 0.65)', badgeBg: 'rgba(126, 34, 206, 0.3)', accentHex: '#c084fc' }
+  },
+  {
+    id: 'yt-cosmic-incursion',
+    title: 'Multiverse Incursion Core (YouTube 4K)',
+    category: 'marvel',
+    isVideo: true,
+    isYouTube: true,
+    youTubeId: 'jfKfPfyJRdk',
+    videoUrl: 'https://www.youtube.com/watch?v=jfKfPfyJRdk',
+    imageUrl: 'https://img.youtube.com/vi/jfKfPfyJRdk/hqdefault.jpg',
+    artistCredit: 'Marvel Cinematic Universe (YouTube)',
+    description: 'Immersive multiversal incursion ambient loop streaming direct from YouTube.',
+    palette: { primary: '#38bdf8', secondary: '#0284c7', glowColor: 'rgba(56, 189, 248, 0.65)', badgeBg: 'rgba(2, 132, 199, 0.3)', accentHex: '#38bdf8' }
+  },
+  {
+    id: 'yt-nightcity-ambient',
+    title: 'Cyberpunk Neon Horizon (YouTube Live)',
+    category: 'cyberpunk',
+    isVideo: true,
+    isYouTube: true,
+    youTubeId: 'wA0C0uRx0E4',
+    videoUrl: 'https://www.youtube.com/watch?v=wA0C0uRx0E4',
+    imageUrl: 'https://img.youtube.com/vi/wA0C0uRx0E4/hqdefault.jpg',
+    artistCredit: 'Night City Radio (YouTube)',
+    description: 'Continuous cyberpunk neon rain and synthwave atmosphere.',
+    palette: { primary: '#f43f5e', secondary: '#be123c', glowColor: 'rgba(244, 63, 94, 0.65)', badgeBg: 'rgba(190, 18, 60, 0.3)', accentHex: '#f43f5e' }
   }
 ];
 

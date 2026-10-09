@@ -344,7 +344,7 @@ function AppContent() {
     (!activeCustomUrl && (activeBackground?.isVideo || activeBackground?.videoUrl))
   );
 
-  const currentBgMedia = activeCustomUrl || (activeBackground.isVideo && activeBackground.videoUrl ? activeBackground.videoUrl : activeBackground.imageUrl);
+  const currentBgMedia = activeCustomUrl || (activeBackground?.isVideo && activeBackground?.videoUrl ? activeBackground.videoUrl : (activeBackground?.imageUrl || CURATED_BACKGROUNDS[0].imageUrl));
 
   // Background Video & YouTube Control Handlers
   const handleToggleBgVideoPlay = () => {
@@ -405,7 +405,7 @@ function AppContent() {
   };
 
   // Compute Adaptive Theme with full customizer settings
-  const backgroundPalette = activeCustomUrl ? undefined : activeBackground.palette;
+  const backgroundPalette = activeCustomUrl ? undefined : activeBackground?.palette;
   const adaptedTheme = getAdaptedTheme(clockPreset, backgroundPalette, customSettings);
 
   // Pure Clean View Condition: in full screen OR cinema mode, ONLY the countdown is visible!
@@ -430,7 +430,7 @@ function AppContent() {
           <iframe
             ref={bgYouTubeIframeRef}
             key={`yt-bg-${currentBgYouTubeId}`}
-            src={`https://www.youtube.com/embed/${currentBgYouTubeId}?autoplay=1&mute=${isBgVideoMuted ? 1 : 0}&controls=0&loop=1&playlist=${currentBgYouTubeId}&playsinline=1&rel=0&showinfo=0&modestbranding=1&enablejsapi=1&origin=${typeof window !== 'undefined' ? encodeURIComponent(window.location.origin) : ''}`}
+            src={`https://www.youtube.com/embed/${currentBgYouTubeId}?autoplay=1&mute=${isBgVideoMuted ? 1 : 0}&controls=0&loop=1&playlist=${currentBgYouTubeId}&playsinline=1&rel=0&showinfo=0&modestbranding=1&enablejsapi=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
             title="Ambient Motion Background"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             className="absolute -top-[12%] -left-[12%] w-[124%] h-[124%] object-cover pointer-events-none border-none scale-105"
@@ -538,7 +538,7 @@ function AppContent() {
           title={
             activeCustomUrl
               ? (currentUser?.preferences?.customImages?.find(i => i.url === activeCustomUrl)?.name || 'Custom Motion Background')
-              : activeBackground.title
+              : (activeBackground?.title || 'Ambient Wallpaper')
           }
           isPlaying={isBgVideoPlaying}
           onTogglePlay={handleToggleBgVideoPlay}

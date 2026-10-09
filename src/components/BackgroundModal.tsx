@@ -14,7 +14,7 @@ import {
   Plus,
   Loader2
 } from 'lucide-react';
-import { CURATED_BACKGROUNDS, type BackgroundItem, getDailyBackground } from '../data/curatedBackgrounds';
+import { CURATED_BACKGROUNDS, type BackgroundItem, type UserInterest, getDailyBackground } from '../data/curatedBackgrounds';
 import { useAuth } from '../context/AuthContext';
 import { soundEngine } from '../audio/soundEngine';
 import { fetchArtworksForCountdown, fetchArtworksFromWeb } from '../utils/artworkFetcher';
@@ -71,6 +71,10 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [hasLoadedWeb, setHasLoadedWeb] = useState(false);
 
+  // Media URL Parsing & Detection State
+  const [detectedMedia, setDetectedMedia] = useState<ParsedMedia | null>(null);
+  const [isFetchingMeta, setIsFetchingMeta] = useState(false);
+
   // 24h Rotation State
   const isAutoRotate = currentUser?.preferences?.autoRotate24h !== false;
   const [dailyOffset, setDailyOffset] = useState(0);
@@ -116,15 +120,11 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
     }
   };
 
-  if (!isOpen || !currentUser) return null;
-
-  const interests = currentUser.preferences.interests;
+  const interests = currentUser?.preferences?.interests || (['doom', 'marvel'] as UserInterest[]);
   const todayDaily = getDailyBackground(interests, dailyOffset);
   const tomorrowDaily = getDailyBackground(interests, dailyOffset + 1);
 
-  // Media URL Parsing & Detection State
-  const [detectedMedia, setDetectedMedia] = useState<ParsedMedia | null>(null);
-  const [isFetchingMeta, setIsFetchingMeta] = useState(false);
+  if (!isOpen) return null;
 
   // Unified Wallpaper & Video Activators
   const handleSelectCustom = (url: string, name?: string, isVideo?: boolean, isYouTube?: boolean, youTubeId?: string) => {
@@ -451,7 +451,7 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {CURATED_BACKGROUNDS.map(item => {
-                  const isActive = !activeCustomUrl && activeBackground.id === item.id;
+                  const isActive = !activeCustomUrl && activeBackground?.id === item.id;
                   return (
                     <div
                       key={item.id}
@@ -593,7 +593,7 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   {webArtworks.map(item => {
-                    const isActive = activeCustomUrl === item.imageUrl || (!activeCustomUrl && activeBackground.id === item.id);
+                    const isActive = activeCustomUrl === item.imageUrl || (!activeCustomUrl && activeBackground?.id === item.id);
                     return (
                       <div
                         key={item.id}
@@ -708,7 +708,7 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400 mb-3 flex items-center gap-2">
                   <span>Today's Rotation Artwork</span>
-                  {!activeCustomUrl && activeBackground.id === todayDaily.id && (
+                  {!activeCustomUrl && activeBackground?.id === todayDaily.id && (
                     <span className="text-emerald-400 text-[10px] font-mono">• Active Right Now</span>
                   )}
                 </h4>
@@ -737,7 +737,7 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
                         Credit: {todayDaily.artistCredit}
                       </p>
                     </div>
-                    {!activeCustomUrl && activeBackground.id === todayDaily.id && (
+                    {!activeCustomUrl && activeBackground?.id === todayDaily.id && (
                       <div className="w-9 h-9 rounded-full bg-emerald-500 text-black flex items-center justify-center font-bold shadow-[0_0_15px_rgba(0,255,136,0.8)]">
                         <Check className="w-5 h-5 stroke-[3]" />
                       </div>
@@ -871,7 +871,7 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    {customImages.map(img => {
+                    {customImages.filter(img => Boolean(img && img.id)).map(img => {
                       const isActive = activeCustomUrl === img.url;
                       return (
                         <div

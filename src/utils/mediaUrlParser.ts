@@ -166,7 +166,46 @@ export async function fetchLinkMetadata(
 }
 
 /**
- * Sends a command to an embedded YouTube iframe via postMessage
+ * Builds a robust, standardized YouTube Embed URL with API control and origin parameters
+ */
+export function buildYouTubeEmbedUrl(
+  videoId: string,
+  options: {
+    autoplay?: boolean;
+    mute?: boolean;
+    controls?: boolean;
+    loop?: boolean;
+    isLive?: boolean;
+  } = {}
+): string {
+  const { autoplay = true, mute = false, controls = false, loop = true, isLive = false } = options;
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const params = new URLSearchParams({
+    enablejsapi: '1',
+    autoplay: autoplay ? '1' : '0',
+    mute: mute ? '1' : '0',
+    controls: controls ? '1' : '0',
+    playsinline: '1',
+    rel: '0',
+    showinfo: '0',
+    modestbranding: '1',
+    iv_load_policy: '3',
+  });
+
+  if (loop && !isLive) {
+    params.set('loop', '1');
+    params.set('playlist', videoId);
+  }
+
+  if (origin && origin.startsWith('http')) {
+    params.set('origin', origin);
+  }
+
+  return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
+}
+
+/**
+ * Sends a command to an embedded YouTube iframe via postMessage with listening handshake
  */
 export function sendYouTubeCommand(
   iframe: HTMLIFrameElement | null,
@@ -175,6 +214,7 @@ export function sendYouTubeCommand(
 ) {
   if (!iframe || !iframe.contentWindow) return;
   try {
+    // 1. Send the command
     iframe.contentWindow.postMessage(
       JSON.stringify({
         event: 'command',
@@ -183,7 +223,15 @@ export function sendYouTubeCommand(
       }),
       '*'
     );
+    // 2. Also send listening handshake to ensure YouTube acknowledges parent listener
+    iframe.contentWindow.postMessage(
+      JSON.stringify({
+        event: 'listening',
+      }),
+      '*'
+    );
   } catch (err) {
     console.warn('Failed to send YouTube iframe command:', err);
   }
 }
+

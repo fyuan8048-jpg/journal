@@ -44,19 +44,27 @@ export const BUILTIN_MUSIC_TRACKS: MusicTrack[] = [
   },
   {
     id: 'marvel-lofi-chill',
-    title: 'Marvel Lofi Radio: Beats to Relax / Avenge To',
-    artist: 'Marvel Cinematic Beats (YouTube)',
-    url: 'https://www.youtube.com/watch?v=jfKfPfyJRdk',
+    title: 'Marvel Lofi Radio: Beats to Relax / Study',
+    artist: 'Lofi Girl 24/7 (YouTube)',
+    url: 'https://www.youtube.com/watch?v=5qap5aO4i9A',
     isYouTube: true,
-    youTubeId: 'jfKfPfyJRdk',
+    youTubeId: '5qap5aO4i9A',
   },
   {
     id: 'cyberpunk-synthwave-stream',
-    title: 'Night City 2077 Cyberpunk Ambient Radio',
-    artist: 'Synthwave Soundscapes (YouTube)',
-    url: 'https://www.youtube.com/watch?v=wA0C0uRx0E4',
+    title: 'Night City Synthwave Radio (24/7 Live Stream)',
+    artist: 'Lofi Girl Synthwave (YouTube)',
+    url: 'https://www.youtube.com/watch?v=4xDzrJKXOOY',
     isYouTube: true,
-    youTubeId: 'wA0C0uRx0E4',
+    youTubeId: '4xDzrJKXOOY',
+  },
+  {
+    id: 'sleep-chill-lofi',
+    title: 'Multiversal Sleep & Chill Beats',
+    artist: 'Lofi Girl Chill (YouTube)',
+    url: 'https://www.youtube.com/watch?v=DWcJFNfaw9c',
+    isYouTube: true,
+    youTubeId: 'DWcJFNfaw9c',
   }
 ];
 

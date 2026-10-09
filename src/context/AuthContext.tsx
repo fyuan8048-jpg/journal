@@ -79,6 +79,7 @@ export interface UserProfile {
     bgVideoMuted?: boolean;
     bgVideoPlaying?: boolean;
     bgVideoSpeed?: number;
+    bgMotionEnabled?: boolean;
   };
 }
 

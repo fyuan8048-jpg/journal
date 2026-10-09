@@ -128,37 +128,40 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
   if (!isOpen) return null;
 
   // Unified Wallpaper & Video Activators
-  const handleSelectCustom = (url: string, name?: string, isVideo?: boolean, isYouTube?: boolean, youTubeId?: string) => {
-    const matched = customImages.find(i => i.url === url || i.id === url);
+  const handleSelectCustom = (url: string, name?: string, isVideo?: boolean, isYouTube?: boolean, youTubeId?: string, mediaId?: string) => {
+    const matched = customImages.find(i => i.url === url || i.id === url || (mediaId && i.id === mediaId));
     const finalIsYouTube = isYouTube !== undefined ? isYouTube : Boolean(matched?.isYouTube);
     const finalYouTubeId = youTubeId || matched?.youTubeId;
     const finalIsVideo = isVideo !== undefined ? isVideo : Boolean(matched?.isVideo || finalIsYouTube || url.match(/\.(mp4|webm|mov|mkv|m4v)(\?.*)?$/i));
     setActiveCustomUrl(url, { isVideo: finalIsVideo, isYouTube: finalIsYouTube, youTubeId: finalYouTubeId, name });
     updatePreferences({
       activeCustomImageUrl: url,
-      activeCustomImageId: matched?.id,
+      activeCustomImageId: mediaId || matched?.id,
       activeCustomMediaIsVideo: finalIsVideo,
       activeCustomMediaIsYouTube: finalIsYouTube,
       activeCustomMediaYouTubeId: finalYouTubeId,
+      bgMotionEnabled: finalIsVideo,
       activeBackgroundId: undefined,
     });
     soundEngine.playSelect();
     showToast(`✓ Wallpaper applied: ${name || 'Custom Media'}`);
   };
 
-  const handleSelectCurated = (item: BackgroundItem) => {
+  const handleSelectCurated = (item: BackgroundItem, asMotion?: boolean) => {
     setActiveBackground(item);
     setActiveCustomUrl(undefined);
+    const isVid = asMotion !== undefined ? asMotion : Boolean(item.isVideo);
     updatePreferences({
       activeBackgroundId: item.id,
       activeCustomImageUrl: undefined,
       activeCustomImageId: undefined,
-      activeCustomMediaIsVideo: Boolean(item.isVideo),
+      activeCustomMediaIsVideo: isVid,
       activeCustomMediaIsYouTube: Boolean(item.isYouTube),
       activeCustomMediaYouTubeId: item.youTubeId,
+      bgMotionEnabled: isVid,
     });
     soundEngine.playSelect();
-    showToast(`✓ Wallpaper applied: ${item.title}`);
+    showToast(`✓ ${isVid ? 'Motion Background' : 'Artwork'} applied: ${item.title}`);
   };
 
   const handleSelectDaily = (item: BackgroundItem) => {
@@ -266,7 +269,7 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
       thumbnailDataUrl,
     });
 
-    handleSelectCustom(trimmed, title, isVideo, isYouTube, youTubeId);
+    handleSelectCustom(trimmed, title, isVideo, isYouTube, youTubeId, mediaId);
     setNewImageUrl('');
     setNewImageName('');
     setDetectedMedia(null);
@@ -314,7 +317,7 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
           isVideo: true,
         });
 
-        handleSelectCustom(displayUrl, title, true);
+        handleSelectCustom(displayUrl, title, true, false, undefined, mediaId);
         showToast(`✓ Video wallpaper applied: ${title}`);
       } else {
         // Image file processing with canvas compression
@@ -332,7 +335,7 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
           isVideo: false,
         });
 
-        handleSelectCustom(displayUrl, title, false);
+        handleSelectCustom(displayUrl, title, false, false, undefined, mediaId);
         showToast(`✓ Image wallpaper applied: ${title}`);
       }
     } catch (err) {
@@ -520,11 +523,24 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
                           </span>
                         ) : null}
                       </div>
-                      {isActive && (
-                        <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-emerald-500 text-black text-[10px] font-black uppercase flex items-center gap-1 shadow-[0_0_10px_rgba(0,255,136,0.8)]">
-                          <Check className="w-3.5 h-3.5 stroke-[3]" /> Active
-                        </div>
-                      )}
+                      <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
+                        {isActive && (
+                          <div className="px-2.5 py-1 rounded-full bg-emerald-500 text-black text-[10px] font-black uppercase flex items-center gap-1 shadow-[0_0_10px_rgba(0,255,136,0.8)]">
+                            <Check className="w-3.5 h-3.5 stroke-[3]" /> Active
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectCurated(item, true);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-[10px] font-bold shadow-md flex items-center gap-1 hover:scale-105 transition-all"
+                          title="Apply as Motion Background with playback & sound controls"
+                        >
+                          🎬 Motion Mode
+                        </button>
+                      </div>
                       <div className="absolute bottom-3 left-3 right-3">
                         <h4 className="text-sm font-bold text-white group-hover:text-emerald-300 transition-colors truncate drop-shadow">
                           {item.title}

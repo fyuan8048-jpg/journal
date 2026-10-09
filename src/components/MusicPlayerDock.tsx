@@ -21,8 +21,13 @@ export const MusicPlayerDock: React.FC<MusicPlayerDockProps> = ({
   const { updatePreferences } = useAuth();
 
   const handleTogglePlay = () => {
-    const next = soundEngine.toggleMusic();
+    const next = !isMusicPlaying;
     setIsMusicPlaying(next);
+    if (!next) {
+      soundEngine.pauseMusic();
+    } else {
+      soundEngine.playTrack(currentTrack);
+    }
     updatePreferences({ isMusicPlaying: next, currentMusicTrackId: currentTrack.id });
   };
 

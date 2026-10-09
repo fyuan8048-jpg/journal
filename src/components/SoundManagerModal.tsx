@@ -31,6 +31,8 @@ interface SoundManagerModalProps {
   onToggleMute: () => void;
   isClockMuted?: boolean;
   onToggleClockMute?: () => void;
+  musicVolume?: number;
+  setMusicVolume?: (vol: number) => void;
   currentTrack: MusicTrack;
   setCurrentTrack: (track: MusicTrack) => void;
   isMusicPlaying: boolean;
@@ -48,6 +50,8 @@ export const SoundManagerModal: React.FC<SoundManagerModalProps> = ({
   onToggleMute,
   isClockMuted = false,
   onToggleClockMute,
+  musicVolume,
+  setMusicVolume,
   currentTrack,
   setCurrentTrack,
   isMusicPlaying,
@@ -63,7 +67,7 @@ export const SoundManagerModal: React.FC<SoundManagerModalProps> = ({
   const [customTracks, setCustomTracks] = useState<MusicTrack[]>([]);
   const [detectedTrackMedia, setDetectedTrackMedia] = useState<ParsedMedia | null>(null);
   const [isFetchingTrackMeta, setIsFetchingTrackMeta] = useState(false);
-  const [musicVol, setMusicVol] = useState(soundEngine.getMusicVolume());
+  const [musicVol, setMusicVol] = useState(musicVolume ?? soundEngine.getMusicVolume());
   const [tickVol, setTickVol] = useState(soundEngine.getClockVolume());
   const [error, setError] = useState('');
   const [clockSoundNotice, setClockSoundNotice] = useState('');
@@ -158,8 +162,13 @@ export const SoundManagerModal: React.FC<SoundManagerModalProps> = ({
   };
 
   const handleTogglePlay = () => {
-    const next = soundEngine.toggleMusic();
+    const next = !isMusicPlaying;
     setIsMusicPlaying(next);
+    if (!next) {
+      soundEngine.pauseMusic();
+    } else {
+      soundEngine.playTrack(currentTrack);
+    }
     updatePreferences({ isMusicPlaying: next, currentMusicTrackId: currentTrack.id });
   };
 
@@ -421,6 +430,7 @@ export const SoundManagerModal: React.FC<SoundManagerModalProps> = ({
                       const val = parseFloat(e.target.value);
                       setMusicVol(val);
                       soundEngine.setMusicVolume(val);
+                      if (setMusicVolume) setMusicVolume(val);
                       updatePreferences({ musicVolume: val });
                     }}
                     className="w-full sm:w-64 accent-emerald-500 cursor-pointer"

@@ -59,7 +59,7 @@ export function parseMediaUrl(url: string): ParsedMedia {
       type: 'youtube',
       id: ytId,
       embedUrl: `https://www.youtube.com/embed/${ytId}`,
-      thumbnailUrl: `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`,
+      thumbnailUrl: `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`,
       directUrl: cleanUrl,
       defaultTitle: `YouTube Media (${ytId})`,
     };
@@ -190,6 +190,8 @@ export function buildYouTubeEmbedUrl(
     showinfo: '0',
     modestbranding: '1',
     iv_load_policy: '3',
+    vq: 'hd2160',      // Request 4K / 2160p or highest available resolution
+    hd: '1',           // Enable HD mode
   });
 
   if (loop && !isLive) {
@@ -209,7 +211,7 @@ export function buildYouTubeEmbedUrl(
  */
 export function sendYouTubeCommand(
   iframe: HTMLIFrameElement | null,
-  func: 'playVideo' | 'pauseVideo' | 'stopVideo' | 'mute' | 'unMute' | 'setVolume' | 'seekTo' | 'setPlaybackRate',
+  func: 'playVideo' | 'pauseVideo' | 'stopVideo' | 'mute' | 'unMute' | 'setVolume' | 'seekTo' | 'setPlaybackRate' | 'setPlaybackQuality' | 'setPlaybackQualityRange',
   args: (number | string | boolean)[] = []
 ) {
   if (!iframe || !iframe.contentWindow) return;

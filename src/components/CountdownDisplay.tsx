@@ -26,13 +26,14 @@ interface LiquidGlassPodProps {
 /**
  * LiquidGlassPod — Apple iOS 27 / visionOS luxury fluid refractive glass capsule.
  * Features:
- * - Ultra-refractive multi-layer frosted glass (no opaque muddy fills).
- * - Real-time specular cursor light reflection (liquid sheen).
- * - Physical 3D tilt tracking (perspective rotateX / rotateY).
- * - Curved top-edge crystal bevel highlight line.
- * - Fluid second-tick luminescence refraction wave.
- * - Perfectly centered tabular numerals (rock-solid, 0px drift).
- * - Frosted crystal pill unit badge with specular rim.
+ * - Fluid sizing that guarantees 100% containment inside the bigger dock block.
+ * - Multi-layer frosted liquid glass optics with zero muddy fills.
+ * - Dynamic cursor specular light sheen (liquid glare reflection).
+ * - Tactile 3D tilt tracking (perspective rotateX / rotateY).
+ * - Top crystal bevel horizon highlight.
+ * - Second tick luminescence wave.
+ * - Stationary tabular numbers (0px drift, razor sharp).
+ * - Frosted pill unit badge with specular rim.
  */
 const LiquidGlassPod: React.FC<LiquidGlassPodProps> = ({
   value,
@@ -55,8 +56,8 @@ const LiquidGlassPod: React.FC<LiquidGlassPodProps> = ({
     const rect = podRef.current.getBoundingClientRect();
     const px = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const py = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-    const rx = (py - 0.5) * -16; // 3D tilt rotation around X-axis
-    const ry = (px - 0.5) * 16;  // 3D tilt rotation around Y-axis
+    const rx = (py - 0.5) * -14; // 3D tilt rotation around X-axis
+    const ry = (px - 0.5) * 14;  // 3D tilt rotation around Y-axis
     setMouseState({
       x: px * 100,
       y: py * 100,
@@ -89,19 +90,19 @@ const LiquidGlassPod: React.FC<LiquidGlassPodProps> = ({
       onPointerLeave={handlePointerLeave}
       onPointerEnter={handlePointerEnter}
       onClick={handleClick}
-      className="relative flex-1 min-w-[50px] xs:min-w-[62px] sm:min-w-[80px] md:min-w-[100px] lg:min-w-[125px] xl:min-w-[140px] max-w-[165px] aspect-[3.7/5] sm:aspect-square md:aspect-[4/5] flex flex-col items-center justify-between select-none text-center p-2 sm:p-3.5 md:p-5 lg:p-6 rounded-2xl sm:rounded-3xl bg-gradient-to-b from-white/[0.18] via-white/[0.08] to-white/[0.02] hover:from-white/[0.24] hover:via-white/[0.12] hover:to-white/[0.04] border border-white/35 hover:border-white/60 backdrop-blur-3xl shadow-[0_16px_40px_rgba(0,0,0,0.45),inset_0_1.5px_2px_rgba(255,255,255,0.6),inset_0_-1px_2px_rgba(0,0,0,0.3),inset_0_0_20px_rgba(255,255,255,0.06)] hover:shadow-[0_24px_60px_rgba(0,0,0,0.6),0_0_30px_rgba(255,255,255,0.25),inset_0_2px_3px_rgba(255,255,255,0.8)] cursor-pointer group transition-all duration-200"
+      className="relative flex-1 min-w-0 w-full aspect-[3.6/5] sm:aspect-square md:aspect-[4/5] flex flex-col items-center justify-between select-none text-center p-2 xs:p-2.5 sm:p-3.5 md:p-4 lg:p-5 rounded-2xl sm:rounded-3xl bg-gradient-to-b from-white/[0.18] via-white/[0.08] to-white/[0.02] hover:from-white/[0.24] hover:via-white/[0.12] hover:to-white/[0.04] border border-white/35 hover:border-white/60 backdrop-blur-3xl shadow-[0_12px_32px_rgba(0,0,0,0.4),inset_0_1.5px_2px_rgba(255,255,255,0.6),inset_0_-1px_2px_rgba(0,0,0,0.25),inset_0_0_15px_rgba(255,255,255,0.06)] hover:shadow-[0_20px_45px_rgba(0,0,0,0.55),0_0_25px_rgba(255,255,255,0.25),inset_0_2px_3px_rgba(255,255,255,0.8)] cursor-pointer group transition-all duration-200 overflow-hidden"
       style={{
         opacity: theme.transparency,
         transform: mouseState.active
-          ? `perspective(800px) rotateX(${mouseState.rx.toFixed(2)}deg) rotateY(${mouseState.ry.toFixed(2)}deg) scale3d(1.04, 1.04, 1.04)`
-          : 'perspective(800px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)',
+          ? `perspective(800px) rotateX(${mouseState.rx.toFixed(2)}deg) rotateY(${mouseState.ry.toFixed(2)}deg)`
+          : 'perspective(800px) rotateX(0deg) rotateY(0deg)',
         transition: mouseState.active
           ? 'transform 0.08s ease-out'
           : 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, border-color 0.3s ease, background 0.3s ease',
       }}
       title="Click to customize title, fonts, colors & themes"
     >
-      {/* 1. Specular Curved Top Rim Highlight (Apple visionOS / iOS 27 precision molded crystal edge) */}
+      {/* 1. Specular Curved Top Rim Highlight (Apple molded crystal edge) */}
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-white/90 to-transparent rounded-t-2xl sm:rounded-t-3xl z-20"
         aria-hidden="true"
@@ -109,7 +110,7 @@ const LiquidGlassPod: React.FC<LiquidGlassPodProps> = ({
 
       {/* 2. Prismatic Inner Bevel Line */}
       <div
-        className="pointer-events-none absolute inset-[1px] rounded-[1.1rem] sm:rounded-[1.6rem] border border-white/10 z-15"
+        className="pointer-events-none absolute inset-[1px] rounded-[1rem] sm:rounded-[1.5rem] border border-white/10 z-15"
         aria-hidden="true"
       />
 
@@ -124,7 +125,7 @@ const LiquidGlassPod: React.FC<LiquidGlassPodProps> = ({
         className="pointer-events-none absolute inset-0 rounded-2xl sm:rounded-3xl transition-opacity duration-300 z-10"
         style={{
           opacity: mouseState.active ? 1 : 0,
-          background: `radial-gradient(190px circle at ${mouseState.x}% ${mouseState.y}%, rgba(255, 255, 255, 0.38), transparent 70%)`,
+          background: `radial-gradient(180px circle at ${mouseState.x}% ${mouseState.y}%, rgba(255, 255, 255, 0.38), transparent 70%)`,
         }}
         aria-hidden="true"
       />
@@ -148,7 +149,7 @@ const LiquidGlassPod: React.FC<LiquidGlassPodProps> = ({
         }}
       >
         <span
-          className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-black tracking-tight tabular-nums block w-full text-center select-none leading-none drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]"
+          className="text-2xl xs:text-3xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-black tracking-tight tabular-nums block w-full text-center select-none leading-none drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]"
           style={{
             fontFamily: theme.fontFamily,
             color: '#ffffff',
@@ -167,9 +168,9 @@ const LiquidGlassPod: React.FC<LiquidGlassPodProps> = ({
       </div>
 
       {/* 7. Liquid Frosted Unit Pill Badge */}
-      <div className="mt-1 sm:mt-2.5 px-2 sm:px-3 py-0.5 rounded-full bg-white/[0.12] group-hover:bg-white/[0.22] border border-white/25 backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.3)] transition-all duration-200 z-20">
+      <div className="mt-1 xs:mt-1.5 sm:mt-2 px-1.5 xs:px-2 sm:px-3 py-0.5 rounded-full bg-white/[0.12] group-hover:bg-white/[0.22] border border-white/25 backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.3)] transition-all duration-200 z-20">
         <span
-          className="text-[8px] xs:text-[9px] sm:text-[10px] md:text-xs font-mono font-black uppercase tracking-widest block transition-colors drop-shadow-sm"
+          className="text-[7.5px] xs:text-[8.5px] sm:text-[9.5px] md:text-xs font-mono font-black uppercase tracking-widest block transition-colors drop-shadow-sm"
           style={{
             fontFamily: theme.fontFamily,
             color: isLiquidTheme ? '#e0f2fe' : (theme.primaryColor || '#ffffff'),
@@ -245,7 +246,7 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
   // Liquid Glass Dual Droplet Separator
   const renderSeparator = () => (
     <div
-      className="flex flex-col justify-center items-center pb-3 xs:pb-4 sm:pb-6 md:pb-8 px-0.5 xs:px-1 shrink-0 text-center select-none"
+      className="hidden sm:flex flex-col justify-center items-center pb-3 xs:pb-4 sm:pb-6 md:pb-8 px-0.5 xs:px-1 shrink-0 text-center select-none"
       style={{ opacity: theme.transparency }}
     >
       <div className="flex flex-col items-center gap-1.5 xs:gap-2 sm:gap-3">
@@ -346,16 +347,16 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
         </p>
       </div>
 
-      {/* Main Countdown Display — Floating Liquid Glass Dock Container (Zero Scrollbars, Fully Responsive) */}
-      <div className="relative w-full max-w-5xl p-2.5 sm:p-5 md:p-6 rounded-[2rem] sm:rounded-[3rem] bg-gradient-to-b from-white/[0.08] via-white/[0.03] to-black/[0.2] backdrop-blur-3xl border border-white/25 shadow-[0_30px_90px_rgba(0,0,0,0.55),inset_0_1.5px_2px_rgba(255,255,255,0.4),inset_0_-1.5px_2px_rgba(0,0,0,0.3)] pointer-events-auto no-scrollbar overflow-visible">
+      {/* Main Countdown Display — Floating Liquid Glass Dock Container (100% CONTAINED, Zero Spill, Zero Scrollbars) */}
+      <div className="relative w-full max-w-5xl mx-auto p-3 xs:p-4 sm:p-5 md:p-6 lg:p-7 rounded-[2rem] sm:rounded-[2.5rem] md:rounded-[3rem] bg-gradient-to-b from-white/[0.12] via-white/[0.04] to-black/[0.25] backdrop-blur-3xl border border-white/30 shadow-[0_30px_90px_rgba(0,0,0,0.55),inset_0_1.5px_2px_rgba(255,255,255,0.4),inset_0_-1.5px_2px_rgba(0,0,0,0.3)] pointer-events-auto no-scrollbar overflow-hidden">
         {/* Top Horizon Bevel Reflection Beam */}
         <div
-          className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-white/80 to-transparent rounded-t-[2rem] sm:rounded-t-[3rem] z-20"
+          className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-white/85 to-transparent rounded-t-[2rem] sm:rounded-t-[3rem] z-20"
           aria-hidden="true"
         />
 
-        <div className="flex items-center justify-center w-full gap-1 xs:gap-1.5 sm:gap-2.5 md:gap-3.5 select-none no-scrollbar">
-          {/* Optional Years */}
+        {/* 1. TABLET & DESKTOP LAYOUT (Seamless 1-Row Panoramic Glass Bar) */}
+        <div className="hidden sm:flex items-center justify-between w-full gap-1 sm:gap-2 md:gap-3 lg:gap-4 select-none no-scrollbar">
           {includeYears && (
             <>
               <LiquidGlassPod
@@ -369,7 +370,6 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
             </>
           )}
 
-          {/* Months */}
           <LiquidGlassPod
             value={time.months}
             label="Months"
@@ -379,7 +379,6 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
           />
           {renderSeparator()}
 
-          {/* Days */}
           <LiquidGlassPod
             value={time.days}
             label="Days"
@@ -389,7 +388,6 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
           />
           {renderSeparator()}
 
-          {/* Hours */}
           <LiquidGlassPod
             value={time.hours}
             label="Hours"
@@ -399,7 +397,6 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
           />
           {renderSeparator()}
 
-          {/* Minutes */}
           <LiquidGlassPod
             value={time.minutes}
             label="Minutes"
@@ -409,7 +406,6 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
           />
           {renderSeparator()}
 
-          {/* Seconds */}
           <LiquidGlassPod
             value={time.seconds}
             label="Seconds"
@@ -417,6 +413,100 @@ export const CountdownDisplay: React.FC<CountdownDisplayProps> = ({
             isTickPulse={isTickPulse}
             onClick={onOpenCustomizer}
           />
+        </div>
+
+        {/* 2. MOBILE PHONE APP LAYOUT (Crisp 3x2 Grid — 100% Contained, Huge Legible Digits) */}
+        <div className="sm:hidden grid grid-cols-3 gap-2 w-full select-none no-scrollbar">
+          {includeYears ? (
+            <>
+              {/* Row 1: Years, Months, Days */}
+              <LiquidGlassPod
+                value={time.years}
+                label="Years"
+                theme={theme}
+                isTickPulse={isTickPulse}
+                onClick={onOpenCustomizer}
+              />
+              <LiquidGlassPod
+                value={time.months}
+                label="Months"
+                theme={theme}
+                isTickPulse={isTickPulse}
+                onClick={onOpenCustomizer}
+              />
+              <LiquidGlassPod
+                value={time.days}
+                label="Days"
+                theme={theme}
+                isTickPulse={isTickPulse}
+                onClick={onOpenCustomizer}
+              />
+              {/* Row 2: Hours, Minutes, Seconds */}
+              <LiquidGlassPod
+                value={time.hours}
+                label="Hours"
+                theme={theme}
+                isTickPulse={isTickPulse}
+                onClick={onOpenCustomizer}
+              />
+              <LiquidGlassPod
+                value={time.minutes}
+                label="Minutes"
+                theme={theme}
+                isTickPulse={isTickPulse}
+                onClick={onOpenCustomizer}
+              />
+              <LiquidGlassPod
+                value={time.seconds}
+                label="Seconds"
+                theme={theme}
+                isTickPulse={isTickPulse}
+                onClick={onOpenCustomizer}
+              />
+            </>
+          ) : (
+            <>
+              {/* Row 1: Months, Days (Centered in 2 Columns) */}
+              <div className="col-span-3 grid grid-cols-2 gap-2">
+                <LiquidGlassPod
+                  value={time.months}
+                  label="Months"
+                  theme={theme}
+                  isTickPulse={isTickPulse}
+                  onClick={onOpenCustomizer}
+                />
+                <LiquidGlassPod
+                  value={time.days}
+                  label="Days"
+                  theme={theme}
+                  isTickPulse={isTickPulse}
+                  onClick={onOpenCustomizer}
+                />
+              </div>
+              {/* Row 2: Hours, Minutes, Seconds (3 Columns) */}
+              <LiquidGlassPod
+                value={time.hours}
+                label="Hours"
+                theme={theme}
+                isTickPulse={isTickPulse}
+                onClick={onOpenCustomizer}
+              />
+              <LiquidGlassPod
+                value={time.minutes}
+                label="Minutes"
+                theme={theme}
+                isTickPulse={isTickPulse}
+                onClick={onOpenCustomizer}
+              />
+              <LiquidGlassPod
+                value={time.seconds}
+                label="Seconds"
+                theme={theme}
+                isTickPulse={isTickPulse}
+                onClick={onOpenCustomizer}
+              />
+            </>
+          )}
         </div>
       </div>
 

@@ -80,13 +80,13 @@ export const HeaderDock: React.FC<HeaderDockProps> = ({
   };
 
   return (
-    <header className="fixed top-0 inset-x-0 z-40 p-3 sm:p-5 flex items-center justify-between pointer-events-none select-none">
+    <header className="fixed top-0 inset-x-0 z-40 p-2 sm:p-5 flex items-center justify-between pointer-events-none select-none max-w-full">
       {/* Left: Journal Brand & Active Event Dropdown */}
-      <div className="flex items-center gap-2 sm:gap-3 pointer-events-auto">
+      <div className="flex items-center gap-1.5 sm:gap-3 pointer-events-auto shrink-0">
         {/* JOURNAL Website Branding */}
-        <div className="flex items-center gap-2 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-2xl bg-neutral-950/80 border border-emerald-500/50 backdrop-blur-2xl text-white shadow-[0_0_20px_rgba(0,255,136,0.2)]">
-          <div className="w-6 h-6 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
-            <BookOpen className="w-3.5 h-3.5" />
+        <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-2xl bg-neutral-950/80 border border-emerald-500/50 backdrop-blur-2xl text-white shadow-[0_0_20px_rgba(0,255,136,0.2)]">
+          <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+            <BookOpen className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
           </div>
           <div className="flex flex-col">
             <span className="font-black font-display tracking-widest text-xs sm:text-sm text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-emerald-200 to-amber-300">
@@ -102,24 +102,24 @@ export const HeaderDock: React.FC<HeaderDockProps> = ({
         <button
           onClick={() => handleAction(onOpenCountdowns)}
           onMouseEnter={() => soundEngine.playUiHover()}
-          className="flex items-center gap-2 sm:gap-2.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-2xl bg-black/70 hover:bg-black/90 border border-white/15 hover:border-emerald-500/50 backdrop-blur-xl text-white transition-all hover:scale-[1.02] shadow-xl group"
+          className="flex items-center gap-1.5 sm:gap-2.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-2xl bg-black/70 hover:bg-black/90 border border-white/15 hover:border-emerald-500/50 backdrop-blur-xl text-white transition-all hover:scale-[1.02] shadow-xl group"
           title="Switch Active Countdown Event"
         >
           <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#00ff88]" />
           <div className="text-left">
-            <span className="block text-[9px] uppercase font-mono tracking-widest text-emerald-400 font-bold leading-none">
-              ACTIVE TIMER
+            <span className="block text-[8px] sm:text-[9px] uppercase font-mono tracking-widest text-emerald-400 font-bold leading-none">
+              TIMER
             </span>
-            <span className="block text-xs sm:text-sm font-black font-display tracking-wide text-white leading-tight max-w-[110px] sm:max-w-[200px] truncate">
+            <span className="block text-xs sm:text-sm font-black font-display tracking-wide text-white leading-tight max-w-[70px] xs:max-w-[120px] sm:max-w-[200px] truncate">
               {activeCountdown.title}
             </span>
           </div>
-          <ChevronDown className="w-3.5 h-3.5 text-neutral-400 group-hover:text-emerald-400 transition-colors" />
+          <ChevronDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-neutral-400 group-hover:text-emerald-400 transition-colors" />
         </button>
       </div>
 
       {/* Right: Quick Action Buttons Dock */}
-      <div className="flex items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-2xl bg-neutral-950/80 border border-white/15 backdrop-blur-2xl shadow-[0_0_30px_rgba(0,0,0,0.8)] pointer-events-auto">
+      <div className="flex items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-2xl bg-neutral-950/80 border border-white/15 backdrop-blur-2xl shadow-[0_0_30px_rgba(0,0,0,0.8)] pointer-events-auto max-w-[50vw] sm:max-w-none overflow-x-auto no-scrollbar">
         {/* Sound Toggle */}
         <button
           onClick={() => handleAction(onToggleMute)}

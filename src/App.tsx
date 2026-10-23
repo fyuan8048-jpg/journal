@@ -453,6 +453,8 @@ function AppContent() {
         sendYouTubeCommand(iframe, 'mute');
       }
       sendYouTubeCommand(iframe, 'setPlaybackRate', [bgVideoSpeed]);
+      sendYouTubeCommand(iframe, 'setPlaybackQuality', ['highres']);
+      sendYouTubeCommand(iframe, 'setPlaybackQualityRange', ['hd1080', 'highres']);
     };
 
     syncBg();
@@ -511,6 +513,8 @@ function AppContent() {
               sendYouTubeCommand(bgYouTubeIframeRef.current, 'mute');
             }
             sendYouTubeCommand(bgYouTubeIframeRef.current, 'setPlaybackRate', [bgVideoSpeed]);
+            sendYouTubeCommand(bgYouTubeIframeRef.current, 'setPlaybackQuality', ['highres']);
+            sendYouTubeCommand(bgYouTubeIframeRef.current, 'setPlaybackQualityRange', ['hd1080', 'highres']);
           }
         }
       } catch {}

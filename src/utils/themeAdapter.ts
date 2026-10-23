@@ -366,7 +366,10 @@ export function getAdaptedTheme(
   };
 
   const presetConfig = CLOCK_PRESETS[preset] || CLOCK_PRESETS.liquid_glass;
-  let primary = custom.primaryColor || presetConfig.primary;
+  let primary = custom.primaryColor;
+  if (!primary || (preset === 'liquid_glass' && primary === '#00ff88')) {
+    primary = presetConfig.primary;
+  }
   let secondary = presetConfig.secondary;
   let accentHex = presetConfig.primary;
 

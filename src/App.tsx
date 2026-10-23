@@ -724,8 +724,8 @@ function AppContent() {
         />
       )}
 
-      {/* 4. Central 100% Fully Transparent Countdown Clock */}
-      <main className="relative z-10 flex-1 flex items-center justify-center w-full px-4 pt-10 pb-16">
+      {/* 4. Central Liquid Glass Countdown Clock (No scrollbars, fully responsive) */}
+      <main className="relative z-10 flex-1 flex items-center justify-center w-full px-2 sm:px-4 pt-6 sm:pt-10 pb-12 sm:pb-16 no-scrollbar overflow-x-hidden">
         <CountdownDisplay
           targetDate={activeCountdown.targetDate}
           title={activeCountdown.title}

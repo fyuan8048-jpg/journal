@@ -26,6 +26,7 @@ interface HeaderDockProps {
   onOpenCountdowns: () => void;
   onOpenBackgrounds: () => void;
   onOpenCollections?: () => void;
+  onOpenJournal?: () => void;
   onOpenSoundStudio: () => void;
   onOpenClockCustomizer: () => void;
   onOpenNotes: () => void;
@@ -43,6 +44,7 @@ export const HeaderDock: React.FC<HeaderDockProps> = ({
   onOpenCountdowns,
   onOpenBackgrounds,
   onOpenCollections,
+  onOpenJournal,
   onOpenSoundStudio,
   onOpenClockCustomizer,
   onOpenNotes,
@@ -56,6 +58,7 @@ export const HeaderDock: React.FC<HeaderDockProps> = ({
   const notesCount = activeCountdown.notes?.length || 0;
   const completedNotes = activeCountdown.notes?.filter(n => n.completed).length || 0;
   const customWallpapersCount = (currentUser?.preferences?.customImages || []).length;
+  const journalEntriesCount = (currentUser?.preferences?.journalEntries || []).length;
 
   const [currentTimeStr, setCurrentTimeStr] = useState('');
 
@@ -223,6 +226,27 @@ export const HeaderDock: React.FC<HeaderDockProps> = ({
             </span>
           )}
         </button>
+
+        {/* Visual Journal & Gemini Strategy Button (iOS Liquid Glass) */}
+        {onOpenJournal && (
+          <button
+            onClick={() => handleAction(onOpenJournal)}
+            onMouseEnter={() => soundEngine.playUiHover()}
+            className="relative flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl bg-purple-950/30 hover:bg-purple-950/70 border border-purple-500/30 hover:border-purple-500/60 text-purple-300 hover:text-white transition-all group"
+            title="Visual Journal & Gemini Goal Strategizer (iOS Liquid Glass)"
+            aria-label="Visual Journal"
+          >
+            <BookOpen className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
+            <span className="text-xs font-bold font-display tracking-wider hidden md:inline">
+              Journal
+            </span>
+            {journalEntriesCount > 0 && (
+              <span className="flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-purple-500 text-black font-black text-[9px] font-mono shadow-[0_0_8px_#a855f7]">
+                {journalEntriesCount}
+              </span>
+            )}
+          </button>
+        )}
 
         {/* Settings / Console */}
         <button

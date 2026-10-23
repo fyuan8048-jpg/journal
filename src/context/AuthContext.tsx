@@ -47,6 +47,37 @@ export interface SavedTheme {
   createdAt: number;
 }
 
+export interface JournalEntry {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: number;
+  mood?: string;
+  artworkTitle?: string;
+  artworkUrl?: string;
+  trackTitle?: string;
+  countdownTitle?: string;
+  tags?: string[];
+}
+
+export interface StrategyMilestone {
+  id: string;
+  title: string;
+  description?: string;
+  completed: boolean;
+  priority: 'high' | 'medium' | 'low';
+  targetDate?: string;
+}
+
+export interface GoalStrategy {
+  missionTitle: string;
+  coreObjective: string;
+  targetTimeline: string;
+  primaryBlockers: string;
+  milestones: StrategyMilestone[];
+  lastUpdated: number;
+}
+
 export interface UserProfile {
   id: string;
   username: string;
@@ -85,6 +116,9 @@ export interface UserProfile {
     customMusicTracks?: MusicTrack[];
     // Saved Custom Themes
     savedThemes?: SavedTheme[];
+    // Visual Journal & Goal Strategy
+    journalEntries?: JournalEntry[];
+    goalStrategy?: GoalStrategy;
     // Background Video & Motion Controls
     bgVideoVolume?: number;
     bgVideoMuted?: boolean;
@@ -108,6 +142,10 @@ interface AuthContextType {
   removeCustomMusicTrack: (id: string) => void;
   saveTheme: (theme: SavedTheme) => void;
   deleteSavedTheme: (id: string) => void;
+  addJournalEntry: (entry: Omit<JournalEntry, 'id' | 'createdAt'>) => void;
+  updateJournalEntry: (entry: JournalEntry) => void;
+  deleteJournalEntry: (id: string) => void;
+  updateGoalStrategy: (strategy: GoalStrategy) => void;
   addCustomCountdown: (event: CountdownEvent) => void;
   updateCountdown: (event: CountdownEvent) => void;
   deleteCountdown: (id: string) => void;
@@ -167,6 +205,7 @@ const DEFAULT_GUEST: UserProfile = {
     isMusicPlaying: false,
     customMusicTracks: [],
     savedThemes: [],
+    journalEntries: [],
     // Video background defaults
     bgVideoVolume: 0.7,
     bgVideoMuted: true,
@@ -638,6 +677,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
+  const addJournalEntry = (entry: Omit<JournalEntry, 'id' | 'createdAt'>) => {
+    const newEntry: JournalEntry = {
+      ...entry,
+      id: `journal_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      createdAt: Date.now(),
+    };
+    setCurrentUser(prev => {
+      const existing = prev.preferences.journalEntries || [];
+      return {
+        ...prev,
+        preferences: {
+          ...prev.preferences,
+          journalEntries: [newEntry, ...existing],
+        }
+      };
+    });
+  };
+
+  const updateJournalEntry = (updated: JournalEntry) => {
+    setCurrentUser(prev => {
+      const existing = prev.preferences.journalEntries || [];
+      return {
+        ...prev,
+        preferences: {
+          ...prev.preferences,
+          journalEntries: existing.map(e => e.id === updated.id ? updated : e),
+        }
+      };
+    });
+  };
+
+  const deleteJournalEntry = (id: string) => {
+    setCurrentUser(prev => {
+      const existing = prev.preferences.journalEntries || [];
+      return {
+        ...prev,
+        preferences: {
+          ...prev.preferences,
+          journalEntries: existing.filter(e => e.id !== id),
+        }
+      };
+    });
+  };
+
+  const updateGoalStrategy = (strategy: GoalStrategy) => {
+    setCurrentUser(prev => ({
+      ...prev,
+      preferences: {
+        ...prev.preferences,
+        goalStrategy: strategy,
+      }
+    }));
+  };
+
   const addCustomCountdown = (event: CountdownEvent) => {
     setCurrentUser(prev => ({
       ...prev,
@@ -727,6 +820,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         removeCustomMusicTrack,
         saveTheme,
         deleteSavedTheme,
+        addJournalEntry,
+        updateJournalEntry,
+        deleteJournalEntry,
+        updateGoalStrategy,
         addCustomCountdown,
         updateCountdown,
         deleteCountdown,

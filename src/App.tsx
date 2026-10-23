@@ -14,6 +14,7 @@ import { SoundManagerModal } from './components/SoundManagerModal';
 import { ClockCustomizerModal } from './components/ClockCustomizerModal';
 import { BackgroundVideoControls } from './components/BackgroundVideoControls';
 import { NotesDrawer } from './components/NotesDrawer';
+import { VisualJournalDrawer } from './components/VisualJournalDrawer';
 import { CollectionsVaultModal } from './components/CollectionsVaultModal';
 import { CURATED_BACKGROUNDS, getDailyBackground, type BackgroundItem } from './data/curatedBackgrounds';
 import { getAdaptedTheme, type ClockStylePreset } from './utils/themeAdapter';
@@ -231,6 +232,7 @@ function AppContent() {
   const [isBackgroundModalOpen, setIsBackgroundModalOpen] = useState(false);
   const [backgroundModalTab, setBackgroundModalTab] = useState<'daily' | 'curated' | 'custom' | 'web'>('curated');
   const [isCollectionsVaultOpen, setIsCollectionsVaultOpen] = useState(false);
+  const [isVisualJournalOpen, setIsVisualJournalOpen] = useState(false);
   const [isInterestModalOpen, setIsInterestModalOpen] = useState(false);
   const [isCountdownModalOpen, setIsCountdownModalOpen] = useState(false);
 
@@ -693,6 +695,10 @@ function AppContent() {
             setIsCollectionsVaultOpen(true);
             soundEngine.playTransitionWhoosh();
           }}
+          onOpenJournal={() => {
+            setIsVisualJournalOpen(true);
+            soundEngine.playTransitionWhoosh();
+          }}
           onOpenSoundStudio={() => {
             setIsSoundStudioOpen(true);
             soundEngine.playTransitionWhoosh();
@@ -1010,6 +1016,17 @@ function AppContent() {
           setCurrentTrack(track);
           updatePreferences({ currentMusicTrackId: track.id });
         }}
+        onShowToast={showToast}
+      />
+
+      <VisualJournalDrawer
+        isOpen={isVisualJournalOpen}
+        onClose={() => setIsVisualJournalOpen(false)}
+        activeCountdownTitle={activeCountdown.title}
+        targetDate={activeCountdown.targetDate}
+        activeBackgroundTitle={activeBackground?.title}
+        activeBackgroundUrl={activeCustomUrl || activeBackground?.imageUrl}
+        activeTrackTitle={currentTrack?.title}
         onShowToast={showToast}
       />
     </div>

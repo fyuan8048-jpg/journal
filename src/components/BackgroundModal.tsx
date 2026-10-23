@@ -12,7 +12,9 @@ import {
   RefreshCw,
   Clock,
   Plus,
-  Loader2
+  Loader2,
+  Bookmark,
+  BookmarkCheck,
 } from 'lucide-react';
 import { CURATED_BACKGROUNDS, type BackgroundItem, type UserInterest, getDailyBackground } from '../data/curatedBackgrounds';
 import { useAuth } from '../context/AuthContext';
@@ -56,7 +58,7 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
   initialTab = 'curated',
   activeCountdown,
 }) => {
-  const { currentUser, addCustomImage, removeCustomImage, updatePreferences } = useAuth();
+  const { currentUser, addCustomImage, removeCustomImage, saveRotationArtwork, updatePreferences } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [newImageUrl, setNewImageUrl] = useState('');
   const [newImageName, setNewImageName] = useState('');
@@ -492,6 +494,7 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
                   return item.category === curatedFilter;
                 }).map(item => {
                   const isActive = !activeCustomUrl && activeBackground?.id === item.id;
+                  const isSaved = customImages.some(img => img.url === (item.videoUrl || item.imageUrl) || img.name === item.title);
                   return (
                     <div
                       key={item.id}
@@ -529,6 +532,25 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
                             <Check className="w-3.5 h-3.5 stroke-[3]" /> Active
                           </div>
                         )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            soundEngine.playSelect();
+                            saveRotationArtwork(item);
+                            soundEngine.playSuccessCheck();
+                            showToast(`✓ Saved "${item.title}" to Vault forever!`);
+                          }}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-bold shadow-md flex items-center gap-1 transition-all ${
+                            isSaved
+                              ? 'bg-emerald-500 text-black'
+                              : 'bg-black/70 hover:bg-emerald-500 text-white hover:text-black opacity-0 group-hover:opacity-100'
+                          }`}
+                          title={isSaved ? 'Saved in Vault' : 'Save rotation artwork to Vault forever'}
+                        >
+                          {isSaved ? <BookmarkCheck className="w-3 h-3" /> : <Bookmark className="w-3 h-3" />}
+                          <span>{isSaved ? 'Saved' : 'Save Forever'}</span>
+                        </button>
                         <button
                           type="button"
                           onClick={(e) => {
@@ -790,11 +812,40 @@ export const BackgroundModal: React.FC<BackgroundModalProps> = ({
                         Credit: {todayDaily.artistCredit}
                       </p>
                     </div>
-                    {!activeCustomUrl && activeBackground?.id === todayDaily.id && (
-                      <div className="w-9 h-9 rounded-full bg-emerald-500 text-black flex items-center justify-center font-bold shadow-[0_0_15px_rgba(0,255,136,0.8)]">
-                        <Check className="w-5 h-5 stroke-[3]" />
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          soundEngine.playSelect();
+                          saveRotationArtwork(todayDaily);
+                          soundEngine.playSuccessCheck();
+                          showToast(`✓ Saved "${todayDaily.title}" to Vault forever!`);
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold font-mono tracking-wider flex items-center gap-1.5 transition-all ${
+                          customImages.some(img => img.url === (todayDaily.videoUrl || todayDaily.imageUrl) || img.name === todayDaily.title)
+                            ? 'bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 cursor-default'
+                            : 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-lg hover:scale-105'
+                        }`}
+                      >
+                        {customImages.some(img => img.url === (todayDaily.videoUrl || todayDaily.imageUrl) || img.name === todayDaily.title) ? (
+                          <>
+                            <BookmarkCheck className="w-3.5 h-3.5" />
+                            <span>Saved in Vault</span>
+                          </>
+                        ) : (
+                          <>
+                            <Bookmark className="w-3.5 h-3.5" />
+                            <span>Save Forever</span>
+                          </>
+                        )}
+                      </button>
+                      {!activeCustomUrl && activeBackground?.id === todayDaily.id && (
+                        <div className="w-9 h-9 rounded-full bg-emerald-500 text-black flex items-center justify-center font-bold shadow-[0_0_15px_rgba(0,255,136,0.8)]">
+                          <Check className="w-5 h-5 stroke-[3]" />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronUp, ChevronDown, Plus, Check, Sparkles, Layers } from 'lucide-react';
+import { ChevronUp, ChevronDown, Plus, Check, Sparkles, Layers, Bookmark, BookmarkCheck } from 'lucide-react';
 import { CURATED_BACKGROUNDS, type BackgroundItem } from '../data/curatedBackgrounds';
 import { useAuth } from '../context/AuthContext';
 import { soundEngine } from '../audio/soundEngine';
@@ -20,7 +20,7 @@ export const QuickWallpaperBar: React.FC<QuickWallpaperBarProps> = ({
   onOpenFullModal,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const { currentUser } = useAuth();
+  const { currentUser, saveRotationArtwork } = useAuth();
   const customImages = currentUser?.preferences?.customImages || [];
 
   const handleToggle = () => {
@@ -140,6 +140,7 @@ export const QuickWallpaperBar: React.FC<QuickWallpaperBarProps> = ({
               {/* Curated Marvel & Doom Artworks */}
               {CURATED_BACKGROUNDS.map(item => {
                 const isSelected = !activeCustomUrl && activeBackground.id === item.id;
+                const isSaved = customImages.some(img => img.url === (item.videoUrl || item.imageUrl) || img.name === item.title);
                 return (
                   <div
                     key={item.id}
@@ -165,6 +166,26 @@ export const QuickWallpaperBar: React.FC<QuickWallpaperBarProps> = ({
                         ▶ Video
                       </span>
                     ) : null}
+                    
+                    {/* Save to Vault Bookmark Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        soundEngine.playSelect();
+                        saveRotationArtwork(item);
+                        soundEngine.playSuccessCheck();
+                      }}
+                      className={`absolute bottom-6 right-1 p-1 rounded-md transition-all z-10 ${
+                        isSaved
+                          ? 'bg-emerald-500 text-black'
+                          : 'bg-black/70 hover:bg-emerald-500 text-neutral-300 hover:text-black opacity-0 group-hover:opacity-100'
+                      }`}
+                      title={isSaved ? 'Saved in Vault' : 'Save artwork to Vault forever'}
+                    >
+                      {isSaved ? <BookmarkCheck className="w-3 h-3" /> : <Bookmark className="w-3 h-3" />}
+                    </button>
+
                     {isSelected && (
                       <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-emerald-500 text-black flex items-center justify-center font-bold">
                         <Check className="w-3 h-3 stroke-[3]" />

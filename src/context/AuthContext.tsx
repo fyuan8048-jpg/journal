@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { UserInterest } from '../data/curatedBackgrounds';
+import type { UserInterest, BackgroundItem } from '../data/curatedBackgrounds';
 import type { ClockStylePreset } from '../utils/themeAdapter';
-import type { SoundEffectType } from '../audio/soundEngine';
+import type { SoundEffectType, MusicTrack } from '../audio/soundEngine';
 import {
   type CountdownEvent,
   type CountdownNote,
@@ -39,6 +39,14 @@ export interface UserCustomImage {
   youTubeId?: string;
 }
 
+export interface SavedTheme {
+  id: string;
+  name: string;
+  preset: ClockStylePreset;
+  customSettings?: ClockCustomSettings;
+  createdAt: number;
+}
+
 export interface UserProfile {
   id: string;
   username: string;
@@ -74,6 +82,9 @@ export interface UserProfile {
     currentMusicYouTubeId?: string;
     isMusicPlaying?: boolean;
     customTickSoundName?: string;
+    customMusicTracks?: MusicTrack[];
+    // Saved Custom Themes
+    savedThemes?: SavedTheme[];
     // Background Video & Motion Controls
     bgVideoVolume?: number;
     bgVideoMuted?: boolean;
@@ -92,6 +103,11 @@ interface AuthContextType {
   updatePreferences: (partial: Partial<UserProfile['preferences']>) => void;
   addCustomImage: (img: Omit<UserCustomImage, 'id' | 'addedAt'> & { id?: string; isVideo?: boolean; isYouTube?: boolean; youTubeId?: string }) => void;
   removeCustomImage: (id: string) => void;
+  saveRotationArtwork: (bg: BackgroundItem) => void;
+  addCustomMusicTrack: (track: MusicTrack) => void;
+  removeCustomMusicTrack: (id: string) => void;
+  saveTheme: (theme: SavedTheme) => void;
+  deleteSavedTheme: (id: string) => void;
   addCustomCountdown: (event: CountdownEvent) => void;
   updateCountdown: (event: CountdownEvent) => void;
   deleteCountdown: (id: string) => void;
@@ -149,6 +165,8 @@ const DEFAULT_GUEST: UserProfile = {
     isMusicMuted: false,
     currentMusicTrackId: 'doomsday-theme',
     isMusicPlaying: false,
+    customMusicTracks: [],
+    savedThemes: [],
     // Video background defaults
     bgVideoVolume: 0.7,
     bgVideoMuted: true,
@@ -539,6 +557,87 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
+  const saveRotationArtwork = (bg: BackgroundItem) => {
+    const isVid = Boolean(bg.isVideo);
+    const isYt = Boolean(bg.isYouTube);
+    addCustomImage({
+      name: bg.title || 'Saved Rotating Artwork',
+      url: bg.videoUrl || bg.imageUrl,
+      collectionName: 'Rotation Archive',
+      isVideo: isVid,
+      isYouTube: isYt,
+      youTubeId: bg.youTubeId,
+      thumbnailDataUrl: bg.imageUrl,
+    });
+  };
+
+  const addCustomMusicTrack = (track: MusicTrack) => {
+    const newTrack: MusicTrack = {
+      ...track,
+      id: track.id || `custom_music_${Date.now()}`,
+      isCustom: true,
+    };
+    setCurrentUser(prev => {
+      const existing = prev.preferences.customMusicTracks || [];
+      const updated = [newTrack, ...existing.filter(t => t.id !== newTrack.id)];
+      return {
+        ...prev,
+        preferences: {
+          ...prev.preferences,
+          customMusicTracks: updated,
+          currentMusicTrackId: newTrack.id,
+          currentMusicYouTubeId: newTrack.isYouTube ? newTrack.youTubeId : undefined,
+        }
+      };
+    });
+  };
+
+  const removeCustomMusicTrack = (id: string) => {
+    setCurrentUser(prev => {
+      const existing = prev.preferences.customMusicTracks || [];
+      return {
+        ...prev,
+        preferences: {
+          ...prev.preferences,
+          customMusicTracks: existing.filter(t => t.id !== id),
+        }
+      };
+    });
+  };
+
+  const saveTheme = (theme: SavedTheme) => {
+    const newTheme: SavedTheme = {
+      ...theme,
+      id: theme.id || `theme_${Date.now()}`,
+      createdAt: theme.createdAt || Date.now(),
+    };
+    setCurrentUser(prev => {
+      const existing = prev.preferences.savedThemes || [];
+      return {
+        ...prev,
+        preferences: {
+          ...prev.preferences,
+          savedThemes: [newTheme, ...existing.filter(t => t.id !== newTheme.id)],
+          clockPreset: newTheme.preset,
+          clockCustomSettings: newTheme.customSettings || prev.preferences.clockCustomSettings,
+        }
+      };
+    });
+  };
+
+  const deleteSavedTheme = (id: string) => {
+    setCurrentUser(prev => {
+      const existing = prev.preferences.savedThemes || [];
+      return {
+        ...prev,
+        preferences: {
+          ...prev.preferences,
+          savedThemes: existing.filter(t => t.id !== id),
+        }
+      };
+    });
+  };
+
   const addCustomCountdown = (event: CountdownEvent) => {
     setCurrentUser(prev => ({
       ...prev,
@@ -623,6 +722,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updatePreferences,
         addCustomImage,
         removeCustomImage,
+        saveRotationArtwork,
+        addCustomMusicTrack,
+        removeCustomMusicTrack,
+        saveTheme,
+        deleteSavedTheme,
         addCustomCountdown,
         updateCountdown,
         deleteCountdown,

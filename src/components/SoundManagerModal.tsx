@@ -57,7 +57,7 @@ export const SoundManagerModal: React.FC<SoundManagerModalProps> = ({
   isMusicPlaying,
   setIsMusicPlaying,
 }) => {
-  const { currentUser, updatePreferences } = useAuth();
+  const { currentUser, updatePreferences, addCustomMusicTrack } = useAuth();
   const [activeTab, setActiveTab] = useState<'music' | 'ticks'>('music');
 
   // Custom Track Upload Form
@@ -112,6 +112,7 @@ export const SoundManagerModal: React.FC<SoundManagerModalProps> = ({
     };
     const updated = [newTrack, ...customTracks];
     setCustomTracks(updated);
+    addCustomMusicTrack(newTrack);
     try {
       localStorage.setItem(STORAGE_KEY_CUSTOM_TRACKS, JSON.stringify(updated.map(t => ({ ...t, url: '' }))));
     } catch {}
@@ -226,6 +227,7 @@ export const SoundManagerModal: React.FC<SoundManagerModalProps> = ({
 
     const updated = [newTrack, ...customTracks];
     setCustomTracks(updated);
+    addCustomMusicTrack(newTrack);
     try {
       localStorage.setItem(STORAGE_KEY_CUSTOM_TRACKS, JSON.stringify(updated.map(t => ({
         ...t,
@@ -276,6 +278,7 @@ export const SoundManagerModal: React.FC<SoundManagerModalProps> = ({
 
     const updated = [newTrack, ...customTracks];
     setCustomTracks(updated);
+    addCustomMusicTrack(newTrack);
     try {
       localStorage.setItem(STORAGE_KEY_CUSTOM_TRACKS, JSON.stringify(updated.map(t => ({ ...t, url: '' }))));
     } catch {}

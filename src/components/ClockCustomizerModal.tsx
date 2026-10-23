@@ -13,10 +13,13 @@ import {
   Calendar,
   Tag,
   Layers,
+  Star,
+  BookmarkCheck,
 } from 'lucide-react';
 import { CLOCK_PRESETS, type ClockStylePreset, buildTextShadow } from '../utils/themeAdapter';
 import type { ClockCustomSettings, CountdownEvent, ShadowStyleType } from '../utils/countdown';
 import { soundEngine } from '../audio/soundEngine';
+import { useAuth } from '../context/AuthContext';
 
 interface ClockCustomizerModalProps {
   isOpen: boolean;
@@ -68,6 +71,9 @@ export const ClockCustomizerModal: React.FC<ClockCustomizerModalProps> = ({
   activeCountdown,
   onUpdateCountdown,
 }) => {
+  const { saveTheme } = useAuth();
+  const [themeSavedToast, setThemeSavedToast] = useState(false);
+
   // Timer Event Title & Schedule State
   const [titleInput, setTitleInput] = useState(activeCountdown.title);
   const [subtitleInput, setSubtitleInput] = useState(activeCountdown.subtitle);
@@ -172,12 +178,34 @@ export const ClockCustomizerModal: React.FC<ClockCustomizerModalProps> = ({
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                soundEngine.playSelect();
+                saveTheme({
+                  id: `theme_${Date.now()}`,
+                  name: `${CLOCK_PRESETS[clockPreset]?.label || clockPreset} (Custom)`,
+                  preset: clockPreset,
+                  customSettings,
+                  createdAt: Date.now(),
+                });
+                soundEngine.playSuccessCheck();
+                setThemeSavedToast(true);
+                setTimeout(() => setThemeSavedToast(false), 3000);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 hover:text-white text-xs font-mono font-bold tracking-wide transition-all shadow-[0_0_15px_rgba(245,158,11,0.2)]"
+              title="Save current custom theme configuration to your Themes folder in the Vault"
+            >
+              {themeSavedToast ? <BookmarkCheck className="w-3.5 h-3.5 text-amber-400" /> : <Star className="w-3.5 h-3.5 text-amber-400" />}
+              <span>{themeSavedToast ? 'Saved in Folder!' : 'Save to Folder'}</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Live Title & Digit Preview Box */}

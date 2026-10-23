@@ -996,12 +996,15 @@ function AppContent() {
       <CollectionsVaultModal
         isOpen={isCollectionsVaultOpen}
         onClose={() => setIsCollectionsVaultOpen(false)}
+        activeBackground={activeBackground}
         onSelectBackground={handleSelectCustomUrl}
         currentClockPreset={clockPreset}
         onSelectClockPreset={(preset) => {
           setClockPreset(preset);
           updatePreferences({ clockPreset: preset });
         }}
+        customSettings={customSettings}
+        onUpdateCustomSettings={handleUpdateCustomSettings}
         currentTrack={currentTrack}
         onSelectMusicTrack={(track) => {
           setCurrentTrack(track);

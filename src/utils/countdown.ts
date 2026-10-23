@@ -38,20 +38,20 @@ export interface ClockCustomSettings {
 }
 
 export const DEFAULT_CLOCK_CUSTOM_SETTINGS: ClockCustomSettings = {
-  primaryColor: '#00ff88',
-  glowColor: 'rgba(0, 255, 136, 0.8)',
+  primaryColor: '',
+  glowColor: 'rgba(56, 189, 248, 0.7)',
   brightness: 1.0,
   scale: 1.0,
   transparency: 1.0,
-  fontFamily: 'Orbitron',
-  shadowStyle: 'deep',
+  fontFamily: 'Montserrat',
+  shadowStyle: 'halo',
   shadowBlur: 14,
-  shadowOpacity: 0.95,
+  shadowOpacity: 0.85,
   titleScale: 1.0,
   titleBrightness: 1.0,
   titleTransparency: 1.0,
   titleColor: '#ffffff',
-  titleFontFamily: 'Orbitron',
+  titleFontFamily: 'Montserrat',
 };
 
 export interface CountdownEvent {

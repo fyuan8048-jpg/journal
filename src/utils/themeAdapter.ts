@@ -1,6 +1,7 @@
 import type { ClockCustomSettings, ShadowStyleType } from './countdown';
 
 export type ClockStylePreset =
+  | 'liquid_glass'
   | 'doomsday'
   | 'godemperor'
   | 'avengers'
@@ -67,6 +68,17 @@ export interface PresetInfo {
 }
 
 export const CLOCK_PRESETS: Record<ClockStylePreset, PresetInfo> = {
+  liquid_glass: {
+    label: 'Liquid Glass (iOS 27)',
+    desc: 'Futuristic Apple iOS 27 & visionOS fluid refractive glass capsules with dynamic specular optics',
+    icon: '🫧',
+    primary: '#e0f2fe',
+    secondary: '#38bdf8',
+    titleColor: '#ffffff',
+    fontFamily: 'Montserrat',
+    titleFontFamily: 'Montserrat',
+    tag: 'iOS 27 Vision',
+  },
   doomsday: {
     label: 'Avengers: Doomsday',
     desc: 'Official Latverian emerald titanium glow with imperial Roman title',
@@ -353,13 +365,13 @@ export function getAdaptedTheme(
     fontFamily: 'Orbitron',
   };
 
-  const presetConfig = CLOCK_PRESETS[preset] || CLOCK_PRESETS.doomsday;
+  const presetConfig = CLOCK_PRESETS[preset] || CLOCK_PRESETS.liquid_glass;
   let primary = custom.primaryColor || presetConfig.primary;
   let secondary = presetConfig.secondary;
   let accentHex = presetConfig.primary;
 
   // Background adaptation fallback if default
-  if (preset === 'doomsday' && backgroundPalette && !custom.primaryColor) {
+  if ((preset === 'doomsday' || preset === 'liquid_glass') && backgroundPalette && !custom.primaryColor) {
     primary = backgroundPalette.primary;
     secondary = backgroundPalette.secondary;
     accentHex = backgroundPalette.accentHex;

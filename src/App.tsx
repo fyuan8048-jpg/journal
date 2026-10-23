@@ -8,7 +8,6 @@ import { CountdownModal } from './components/CountdownModal';
 import { SettingsDrawer } from './components/SettingsDrawer';
 import { AuthModal } from './components/AuthModal';
 import { AudioUnlockBanner } from './components/AudioUnlockBanner';
-import { QuickWallpaperBar } from './components/QuickWallpaperBar';
 import { MusicPlayerDock } from './components/MusicPlayerDock';
 import { SoundManagerModal } from './components/SoundManagerModal';
 import { ClockCustomizerModal } from './components/ClockCustomizerModal';
@@ -83,7 +82,7 @@ function AppContent() {
   const musicYouTubeIframeRef = useRef<HTMLIFrameElement>(null);
 
   // Clock Style & Display Settings
-  const [clockPreset, setClockPreset] = useState<ClockStylePreset>(preferences?.clockPreset ?? 'doomsday');
+  const [clockPreset, setClockPreset] = useState<ClockStylePreset>(preferences?.clockPreset ?? 'liquid_glass');
   const [includeYears, setIncludeYears] = useState<boolean>(preferences?.includeYears ?? true);
   const [customSettings, setCustomSettings] = useState<ClockCustomSettings>(
     preferences?.clockCustomSettings || DEFAULT_CLOCK_CUSTOM_SETTINGS
@@ -756,18 +755,7 @@ function AppContent() {
         />
       )}
 
-      {/* 6. Quick Wallpaper Carousel (Hidden in Fullscreen / Cinema Mode) */}
-      {!isPureCountdownOnly && (
-        <QuickWallpaperBar
-          activeBackground={activeBackground}
-          onSelectCuratedBackground={handleSelectCuratedBackground}
-          activeCustomUrl={activeCustomUrl}
-          onSelectCustomUrl={handleSelectCustomUrl}
-          onOpenFullModal={() => handleOpenBackgrounds('curated')}
-        />
-      )}
-
-      {/* 7. Floating Music Player Mini-Dock (Hidden in Fullscreen / Cinema Mode) */}
+      {/* 6. Floating Music Player Mini-Dock (Hidden in Fullscreen / Cinema Mode) */}
       {!isPureCountdownOnly && (
         <MusicPlayerDock
           currentTrack={currentTrack}

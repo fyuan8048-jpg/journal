@@ -155,7 +155,7 @@ const DEFAULT_GUEST: UserProfile = {
     interests: ['doom', 'marvel'],
     activeCountdownId: 'doomsday',
     includeYears: true,
-    clockPreset: 'doomsday',
+    clockPreset: 'liquid_glass',
     soundType: 'doomsday',
     isMuted: false,
     volume: 0.6,
@@ -198,6 +198,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const savedCurrent = localStorage.getItem(STORAGE_KEY_CURRENT);
       if (savedCurrent) {
         const parsed = JSON.parse(savedCurrent);
+        // Default upgrade: upgrade old 'doomsday' default or missing preset to 'liquid_glass'
+        if (parsed.preferences && (parsed.preferences.clockPreset === 'doomsday' || !parsed.preferences.clockPreset)) {
+          parsed.preferences.clockPreset = 'liquid_glass';
+        }
         return { ...DEFAULT_GUEST, ...parsed, preferences: { ...DEFAULT_GUEST.preferences, ...parsed.preferences } };
       }
     } catch {}

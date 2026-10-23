@@ -14,6 +14,7 @@ import { SoundManagerModal } from './components/SoundManagerModal';
 import { ClockCustomizerModal } from './components/ClockCustomizerModal';
 import { BackgroundVideoControls } from './components/BackgroundVideoControls';
 import { NotesDrawer } from './components/NotesDrawer';
+import { CollectionsVaultModal } from './components/CollectionsVaultModal';
 import { CURATED_BACKGROUNDS, getDailyBackground, type BackgroundItem } from './data/curatedBackgrounds';
 import { getAdaptedTheme, type ClockStylePreset } from './utils/themeAdapter';
 import { soundEngine, type SoundEffectType, type MusicTrack, BUILTIN_MUSIC_TRACKS } from './audio/soundEngine';
@@ -229,6 +230,7 @@ function AppContent() {
   // Modals & UI States
   const [isBackgroundModalOpen, setIsBackgroundModalOpen] = useState(false);
   const [backgroundModalTab, setBackgroundModalTab] = useState<'daily' | 'curated' | 'custom' | 'web'>('curated');
+  const [isCollectionsVaultOpen, setIsCollectionsVaultOpen] = useState(false);
   const [isInterestModalOpen, setIsInterestModalOpen] = useState(false);
   const [isCountdownModalOpen, setIsCountdownModalOpen] = useState(false);
 
@@ -687,7 +689,10 @@ function AppContent() {
             soundEngine.playTransitionWhoosh();
           }}
           onOpenBackgrounds={() => handleOpenBackgrounds('curated')}
-          onOpenCollections={() => handleOpenBackgrounds('curated')}
+          onOpenCollections={() => {
+            setIsCollectionsVaultOpen(true);
+            soundEngine.playTransitionWhoosh();
+          }}
           onOpenSoundStudio={() => {
             setIsSoundStudioOpen(true);
             soundEngine.playTransitionWhoosh();
@@ -986,6 +991,23 @@ function AppContent() {
       <AuthModal
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
+      />
+
+      <CollectionsVaultModal
+        isOpen={isCollectionsVaultOpen}
+        onClose={() => setIsCollectionsVaultOpen(false)}
+        onSelectBackground={handleSelectCustomUrl}
+        currentClockPreset={clockPreset}
+        onSelectClockPreset={(preset) => {
+          setClockPreset(preset);
+          updatePreferences({ clockPreset: preset });
+        }}
+        currentTrack={currentTrack}
+        onSelectMusicTrack={(track) => {
+          setCurrentTrack(track);
+          updatePreferences({ currentMusicTrackId: track.id });
+        }}
+        onShowToast={showToast}
       />
     </div>
   );

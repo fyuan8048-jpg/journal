@@ -7,6 +7,9 @@ export default {
   theme: {
     extend: {
       colors: {
+        background: '#090a0f',
+        foreground: '#f4f4f5',
+        'muted-foreground': '#9ca3af',
         doom: {
           50: '#ecfdf5',
           100: '#d1fae5',

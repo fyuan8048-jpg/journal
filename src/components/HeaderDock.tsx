@@ -13,6 +13,7 @@ import {
   Target,
   Image as ImageIcon,
   BookOpen,
+  FolderArchive,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { soundEngine } from '../audio/soundEngine';
@@ -142,9 +143,30 @@ export const HeaderDock: React.FC<HeaderDockProps> = ({
           <Music className="w-4 h-4 sm:w-5 sm:h-5" />
         </button>
 
+        {/* Interactive Collections Vault (Glass Folder Cards) Button */}
+        {onOpenCollections && (
+          <button
+            onClick={() => handleAction(onOpenCollections)}
+            onMouseEnter={() => soundEngine.playUiHover()}
+            className="relative flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl bg-cyan-950/30 hover:bg-cyan-950/70 border border-cyan-500/30 hover:border-cyan-500/60 text-cyan-300 hover:text-white transition-all group"
+            title={`Open Collections Vault (Interactive 3D Glass Folders for Artworks, Music & Themes)`}
+            aria-label="Collections Vault"
+          >
+            <FolderArchive className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
+            <span className="text-xs font-bold font-display tracking-wider hidden md:inline">
+              Vault
+            </span>
+            {customWallpapersCount > 0 && (
+              <span className="flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-cyan-400 text-black font-black text-[9px] font-mono shadow-[0_0_8px_#22d3ee]">
+                {customWallpapersCount}
+              </span>
+            )}
+          </button>
+        )}
+
         {/* Artwork & Wallpapers Studio Button */}
         <button
-          onClick={() => handleAction(onOpenCollections || onOpenBackgrounds)}
+          onClick={() => handleAction(onOpenBackgrounds)}
           onMouseEnter={() => soundEngine.playUiHover()}
           className="relative flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl bg-emerald-950/30 hover:bg-emerald-950/70 border border-emerald-500/30 hover:border-emerald-500/60 text-emerald-300 hover:text-white transition-all group"
           title={`Choose Artworks & Wallpapers (${customWallpapersCount} custom uploads)`}

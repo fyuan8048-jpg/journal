@@ -1022,11 +1022,6 @@ function AppContent() {
       <VisualJournalDrawer
         isOpen={isVisualJournalOpen}
         onClose={() => setIsVisualJournalOpen(false)}
-        activeCountdownTitle={activeCountdown.title}
-        targetDate={activeCountdown.targetDate}
-        activeBackgroundTitle={activeBackground?.title}
-        activeBackgroundUrl={activeCustomUrl || activeBackground?.imageUrl}
-        activeTrackTitle={currentTrack?.title}
         onShowToast={showToast}
       />
     </div>

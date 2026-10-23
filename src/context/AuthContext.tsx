@@ -53,29 +53,7 @@ export interface JournalEntry {
   content: string;
   createdAt: number;
   mood?: string;
-  artworkTitle?: string;
-  artworkUrl?: string;
-  trackTitle?: string;
-  countdownTitle?: string;
   tags?: string[];
-}
-
-export interface StrategyMilestone {
-  id: string;
-  title: string;
-  description?: string;
-  completed: boolean;
-  priority: 'high' | 'medium' | 'low';
-  targetDate?: string;
-}
-
-export interface GoalStrategy {
-  missionTitle: string;
-  coreObjective: string;
-  targetTimeline: string;
-  primaryBlockers: string;
-  milestones: StrategyMilestone[];
-  lastUpdated: number;
 }
 
 export interface UserProfile {
@@ -116,9 +94,8 @@ export interface UserProfile {
     customMusicTracks?: MusicTrack[];
     // Saved Custom Themes
     savedThemes?: SavedTheme[];
-    // Visual Journal & Goal Strategy
+    // Global Visual Journal
     journalEntries?: JournalEntry[];
-    goalStrategy?: GoalStrategy;
     // Background Video & Motion Controls
     bgVideoVolume?: number;
     bgVideoMuted?: boolean;
@@ -145,7 +122,6 @@ interface AuthContextType {
   addJournalEntry: (entry: Omit<JournalEntry, 'id' | 'createdAt'>) => void;
   updateJournalEntry: (entry: JournalEntry) => void;
   deleteJournalEntry: (id: string) => void;
-  updateGoalStrategy: (strategy: GoalStrategy) => void;
   addCustomCountdown: (event: CountdownEvent) => void;
   updateCountdown: (event: CountdownEvent) => void;
   deleteCountdown: (id: string) => void;
@@ -721,16 +697,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  const updateGoalStrategy = (strategy: GoalStrategy) => {
-    setCurrentUser(prev => ({
-      ...prev,
-      preferences: {
-        ...prev.preferences,
-        goalStrategy: strategy,
-      }
-    }));
-  };
-
   const addCustomCountdown = (event: CountdownEvent) => {
     setCurrentUser(prev => ({
       ...prev,
@@ -823,7 +789,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         addJournalEntry,
         updateJournalEntry,
         deleteJournalEntry,
-        updateGoalStrategy,
         addCustomCountdown,
         updateCountdown,
         deleteCountdown,
